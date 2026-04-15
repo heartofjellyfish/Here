@@ -59,7 +59,7 @@ const SUN_CYCLE_MS = 153_000;
 const FLARE_WINDOW_START = 8;
 const FLARE_WINDOW_END = 82;
 
-type GhostKind = "glint" | "disc" | "ring";
+type GhostKind = "glint" | "disc" | "ring" | "hex";
 type GhostDef = {
   // Axial position along the line from the sun through the lens's
   // optical center (0,0). Negative values live on the opposite side
@@ -117,12 +117,10 @@ type GhostDef = {
 const GHOSTS: GhostDef[] = [
   // Bright glint between sun and center — the sharp hot pinpoint
   // every real lens flare has closest to the source. Stays small
-  // and crisp: a real highlight doesn't bloom.
+  // and crisp: a real highlight doesn't bloom. This is the ONLY
+  // near-sun ghost now; previously there was also a small pale
+  // disc right after it, but the two read as redundant dots.
   { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0.0, defocusResponse: 0.25, sizePhase: 0.2 },
-  // Small pale disc just past the optical center. Slight warm
-  // tint, still near-white — reflections off the first optical
-  // surface barely shift wavelength.
-  { t: -0.1, size: 4, hue: "255, 248, 220", kind: "disc", blur: 1.2, alphaPhase: 0.8, perpOffset: 0.3, defocusResponse: 0.55, sizePhase: 1.1 },
   // The *one* aperture-iris ring. Warm amber — the classic coated
   // iris artifact. Highest defocusResponse: a real iris ring
   // visibly pulses between tight and wide as the sun's off-axis
@@ -130,11 +128,15 @@ const GHOSTS: GhostDef[] = [
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
   // Large soft disc — the anchor of the chain, warmest mid-amber.
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
-  // Subtly cool disc — the one chromatic break in the chain. Pale
-  // blue-grey, *not* saturated cyan: close enough to white to read
-  // as "that ghost happens to catch light differently" rather than
-  // "that ghost is a colored decal."
-  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
+  // HEXAGONAL ghost — the one that actually reveals the lens's
+  // aperture shape. Real lens-flare ghosts are reflections off
+  // the polygonal iris blades, so their outline follows that
+  // polygon; we render most ghosts as circles because heavy
+  // defocus smears them, but one sharper-than-average hex in
+  // the chain is the detail that sells "these are lens optics,
+  // not colored blobs." Subtly cool-tinted so it also carries
+  // the chromatic-separation role.
+  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "hex", blur: 1.4, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
   // Amber ghost further along the chain.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
   // Deepening amber approaching the tail. Warm-only from here so
@@ -159,7 +161,7 @@ function sunPosAt(cyclePct: number): [number, number] {
 
 export default function SunFlare() {
   const ghostRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const streakRef = useRef<HTMLDivElement | null>(null);
+  const starburstRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -175,8 +177,8 @@ export default function SunFlare() {
     let raf = 0;
 
     const tick = () => {
-      const cyclePct =
-        ((performance.now() % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
+      const now = performance.now();
+      const cyclePct = ((now % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
 
       // Envelope: zero outside the window, sin-bell inside. Peaks
       // at the window midpoint (≈45%), which is very close to the
@@ -189,8 +191,24 @@ export default function SunFlare() {
         envelope = Math.sin(u * Math.PI);
       }
 
-      // Sun position and its distance from the optical center.
-      const [sx, sy] = sunPosAt(cyclePct);
+      // --- Camera drift ---
+      // Two independent slow sine waves on X and Y with different
+      // periods so the motion never closes into a circle — reads
+      // as breath, not orbit. Amplitudes intentionally small: we
+      // want the optical center to feel *unfixed* without the
+      // earth or phrase appearing to move. This shifts only the
+      // flare's reference point, not the scene itself — a real
+      // camera move would translate everything, but moving the
+      // earth competes with the emotional focus. Treat it as the
+      // lens elements shifting slightly within a fixed body.
+      const camX = 1.5 * Math.sin(now * 0.00022);
+      const camY = 0.8 * Math.sin(now * 0.00015 + 1.3);
+
+      // Sun position relative to the (now drifting) optical
+      // center, and its distance from it.
+      const [rawSx, rawSy] = sunPosAt(cyclePct);
+      const sx = rawSx - camX;
+      const sy = rawSy - camY;
       const dist = Math.hypot(sx, sy);
 
       // Defocus growth: when the sun is near the optical axis, each
@@ -209,8 +227,13 @@ export default function SunFlare() {
         const el = ghostRefs.current[i];
         if (!el) continue;
 
-        const gx = g.t * sx + g.perpOffset;
-        const gy = g.t * sy + g.perpOffset * 0.4;
+        // Ghost position = opticalCenter + t · (sun - opticalCenter).
+        // With the optical center drifting as (camX, camY), this
+        // expands to camCoord · (1 - t) + t · sunCoord — meaning
+        // far-from-center ghosts parallax *more* than near ones,
+        // which is exactly what real off-axis elements do.
+        const gx = camX * (1 - g.t) + g.t * rawSx + g.perpOffset;
+        const gy = camY * (1 - g.t) + g.t * rawSy + g.perpOffset * 0.4;
 
         // Size driven by two independent sources so the chain
         // doesn't inflate in lockstep:
@@ -245,17 +268,35 @@ export default function SunFlare() {
         el.style.opacity = Math.max(0, Math.min(1, alpha)).toFixed(3);
       }
 
-      // Anamorphic streak — horizontal smear through the optical
-      // center. Presence follows the envelope (slightly dimmer than
-      // peak ghost alpha so it doesn't dominate), width pulses
-      // subtly with the defocus so the streak widens when the sun
-      // is close to the axis.
-      if (streakRef.current) {
-        const streakAlpha = envelope * 0.55;
-        const streakScale = 1 + defocus * 0.15;
-        streakRef.current.style.opacity = streakAlpha.toFixed(3);
-        streakRef.current.style.transform =
-          `translate(-50%, -50%) scaleX(${streakScale.toFixed(3)})`;
+      // Diffraction starburst — the 4-pointed spike pattern a
+      // bright light source creates when it passes through a
+      // polygonal aperture (the same physics that makes stars
+      // look "pointed" in photographs). Anchors directly TO the
+      // sun, not the viewport center, because the spikes emanate
+      // from the light itself. Rotates very slowly so the spikes
+      // feel alive rather than rubber-stamped, and brightens
+      // dramatically as the sun approaches the optical axis —
+      // that's the "奇观" moment where the lens is staring
+      // directly into the source.
+      if (starburstRef.current) {
+        // Position at the sun. Use the raw sun coords (not the
+        // camera-drifted ones) because the starburst *is* on the
+        // sun, and the sun isn't shifted by camera drift — the
+        // sun is a scene object, only the flare ghosts parallax.
+        const bx = rawSx;
+        const by = rawSy;
+        // Strongly peaked at center, not a flat envelope — the
+        // spikes are most dramatic when the sun is dead-on, and
+        // nearly invisible when it's off to the side. Cube of
+        // envelope shapes that curve.
+        const burstAlpha = Math.pow(envelope, 1.4) * (0.35 + defocus * 0.65);
+        const burstScale = 0.8 + defocus * 0.9;
+        const burstRot = (now * 0.006) % 360;
+        starburstRef.current.style.transform =
+          `translate(${bx.toFixed(2)}vw, ${by.toFixed(2)}vh) ` +
+          `translate(-50%, -50%) ` +
+          `rotate(${burstRot.toFixed(2)}deg) scale(${burstScale.toFixed(3)})`;
+        starburstRef.current.style.opacity = Math.max(0, Math.min(1, burstAlpha)).toFixed(3);
       }
 
       raf = requestAnimationFrame(tick);
@@ -267,7 +308,7 @@ export default function SunFlare() {
 
   return (
     <div className="sun-flare" aria-hidden="true">
-      <div ref={streakRef} className="sun-flare__streak" />
+      <div ref={starburstRef} className="sun-flare__starburst" />
       {GHOSTS.map((g, i) => (
         <div
           key={i}

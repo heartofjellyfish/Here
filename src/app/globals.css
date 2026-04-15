@@ -491,34 +491,88 @@ body {
   );
 }
 
-/* Anamorphic streak — a wide horizontal smear through the optical
-   center, the signature artifact of bright light hitting an
-   anamorphic lens element. Tinted COOL BLUE, not warm: that's the
-   Nolan / Interstellar look, and the blue-coated anamorphic front
-   element is the real-world reason. The blue streak also reads
-   with much more contrast against our warm ambient haze than a
-   warm streak ever could — it's the color the eye actually sees
-   because the rest of the flare is already warm. Opacity and
-   horizontal scale are driven from JS each frame (see
-   SunFlare.tsx). */
-.sun-flare__streak {
+/* Hexagonal ghost — a soft warm disc clipped to a regular hexagon.
+   The polygon shape is the point: real lens-flare ghosts take the
+   shape of the aperture (5/6/7/8 blades), and rendering even one
+   hex in the chain is what flips the whole thing from "colored
+   discs" into "camera optics." Flat-top hexagon because that's the
+   canonical photographic aperture orientation. Lower blur than
+   surrounding discs so the polygon silhouette survives. */
+.sun-flare__ghost--hex {
+  background: radial-gradient(
+    closest-side,
+    rgba(var(--ghost-hue), 0.7) 0%,
+    rgba(var(--ghost-hue), 0.45) 35%,
+    rgba(var(--ghost-hue), 0.22) 65%,
+    rgba(var(--ghost-hue), 0.08) 85%,
+    transparent 100%
+  );
+  /* Flat-top regular hexagon. Inner circle radius 50% → vertices
+     at ±43.3% on Y axis (cos 30° × 50%), ±50% on X axis. */
+  clip-path: polygon(
+    25% 0%,
+    75% 0%,
+    100% 50%,
+    75% 100%,
+    25% 100%,
+    0% 50%
+  );
+  /* No border-radius here — the hex clip-path would override it
+     anyway, but making it explicit documents intent. */
+  border-radius: 0;
+}
+
+/* Diffraction starburst — the classic 4-pointed spike pattern a
+   bright light source creates when its rays pass through a
+   polygonal aperture (you see this on every pointed star in a
+   long-exposure photo). Sits AT the sun itself, not along the
+   ghost axis, because the spikes emanate from the light source.
+   Built from two crossed horizontal/vertical gradient bars; JS
+   adds a slow rotation each frame so the spikes don't read as
+   static decal. Blend-mode inherited from .sun-flare. */
+.sun-flare__starburst {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 180vw;
-  height: 6px;
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(200, 225, 255, 0.9) 0%,
-    rgba(160, 205, 255, 0.55) 18%,
-    rgba(130, 185, 245, 0.22) 40%,
-    rgba(110, 170, 230, 0.06) 68%,
-    transparent 92%
-  );
-  filter: blur(3px);
+  width: 32vw;
+  height: 32vw;
   opacity: 0;
   will-change: transform, opacity;
+  /* Horizontal + vertical hairline: two linear gradients crossed
+     at right angles. Each is bright-at-midline, fading to
+     transparent at the ends. Inner hot core comes from a small
+     radial gradient layered on top. */
+  /* Three stacked radial-gradient layers:
+     1. A hot near-white core (the sun-through-aperture hotspot)
+     2. A very thin horizontal ellipse (the horizontal spike)
+     3. A very thin vertical ellipse (the vertical spike)
+     Stacked as additive warmth via the container's screen blend.
+     The ellipses use tiny cross-axis radii (0.5%) so each spike
+     is a hairline band, and large long-axis radii (50%) so the
+     spike reaches to the edge of the starburst box. */
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(255, 248, 220, 0.95) 0%,
+      rgba(255, 235, 190, 0.45) 4%,
+      rgba(255, 220, 160, 0.12) 14%,
+      transparent 28%
+    ),
+    radial-gradient(
+      ellipse 50% 0.5% at center,
+      rgba(255, 242, 215, 1) 0%,
+      rgba(255, 232, 185, 0.55) 18%,
+      rgba(255, 218, 155, 0.18) 50%,
+      transparent 92%
+    ),
+    radial-gradient(
+      ellipse 0.5% 50% at center,
+      rgba(255, 242, 215, 1) 0%,
+      rgba(255, 232, 185, 0.55) 18%,
+      rgba(255, 218, 155, 0.18) 50%,
+      transparent 92%
+    );
+  filter: blur(1.2px);
 }
 
 /* ---------- Film grain ----------
