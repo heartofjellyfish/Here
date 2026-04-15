@@ -72,11 +72,13 @@ function rand(min: number, max: number): number {
 
 /**
  * Place a star at a random % position that falls *outside* the earth's
- * visual disk. The earth sits at the viewport center (see .stage in
- * globals.css), so we reject any candidate whose pixel distance from
- * center is within `excludePx`. Without this, small stars drifted over
- * the globe and blurred with the country dots — the sky and the land
- * stopped reading as separate layers.
+ * visual disk. The earth is NOT at the viewport center — it sits inside
+ * a flex column (.stage) with the phrase, tap button, and reveal below
+ * it, so the group is centered vertically and the earth lands well
+ * above center. We pass the earth's actual pixel center in and exclude
+ * around that. Without this, small stars drifted over the globe and
+ * blurred with the country dots — the sky and the land stopped reading
+ * as separate layers.
  *
  * We cap the retry count so this can never spin forever in a pathological
  * viewport; after giving up we accept the last candidate rather than
@@ -86,26 +88,30 @@ function rand(min: number, max: number): number {
 function randPosOutsideEarth(
   vw: number,
   vh: number,
+  earthCx: number,
+  earthCy: number,
   excludePx: number,
 ): { x: number; y: number } {
-  const cx = vw / 2;
-  const cy = vh / 2;
   const excludeSq = excludePx * excludePx;
   for (let i = 0; i < 12; i++) {
     const x = rand(0, 100);
     const y = rand(0, 100);
-    const dx = (x / 100) * vw - cx;
-    const dy = (y / 100) * vh - cy;
+    const dx = (x / 100) * vw - earthCx;
+    const dy = (y / 100) * vh - earthCy;
     if (dx * dx + dy * dy >= excludeSq) return { x, y };
   }
   return { x: rand(0, 100), y: rand(0, 100) };
 }
 
-function generateStars(excludePx: number): Star[] {
+function generateStars(
+  excludePx: number,
+  earthCx: number,
+  earthCy: number,
+): Star[] {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
   const vh = typeof window !== "undefined" ? window.innerHeight : 768;
   const main: Star[] = Array.from({ length: STAR_COUNT }, (_, i) => {
-    const { x, y } = randPosOutsideEarth(vw, vh, excludePx);
+    const { x, y } = randPosOutsideEarth(vw, vh, earthCx, earthCy, excludePx);
     return {
       id: i,
       x,
@@ -121,7 +127,7 @@ function generateStars(excludePx: number): Star[] {
   // them to "barely there" after the tap, and the flash burst catches
   // their inline --star-min/max baseline at peak.
   const flashers: Star[] = Array.from({ length: FLASH_STAR_COUNT }, (_, i) => {
-    const { x, y } = randPosOutsideEarth(vw, vh, excludePx);
+    const { x, y } = randPosOutsideEarth(vw, vh, earthCx, earthCy, excludePx);
     return {
       id: STAR_COUNT + i,
       x,
@@ -162,7 +168,28 @@ export default function Starfield({ flashAt = null, earthSize = 340 }: Props) {
     // whole upper-center of the sky goes empty — just enough that the
     // eye reads "globe, then sky," not a cloud of dots around a globe.
     const excludePx = earthSize / 2 + 28;
-    setStars(generateStars(excludePx));
+    const measure = () => {
+      // Find the earth's real position. It sits inside .stage, a flex
+      // column with phrase/tap/reveal below it, so the group centers
+      // vertically and the earth lands above the viewport midline.
+      // Using viewport center as a proxy leaks stars onto the globe.
+      const el = document.querySelector(".earth-wrap") as HTMLElement | null;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+      }
+      return { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+    };
+    const apply = () => {
+      const { cx, cy } = measure();
+      setStars(generateStars(excludePx, cx, cy));
+    };
+    apply();
+    // Resize reflows the flex column, which moves the earth. Regen
+    // the field so the exclude disk tracks the new earth position.
+    // Cheap: one resize handler that only fires on actual size change.
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
   }, [earthSize]);
 
   useEffect(() => {

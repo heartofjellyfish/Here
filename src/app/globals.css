@@ -812,6 +812,10 @@ body {
   opacity: 0;
   transition: opacity 1400ms ease 1500ms;
   will-change: transform, filter, opacity;
+  /* Snug the +1 up toward the phrase without touching the stage gap —
+     the phrase and its button want to read as one breath-held pair,
+     with everything below (reveal text) keeping its full spacing. */
+  margin-top: clamp(-18px, -2.2vh, -10px);
 }
 .stage--idle .tap-wrap {
   opacity: 1;
