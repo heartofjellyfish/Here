@@ -33,9 +33,32 @@ export interface Ritual {
   fadeMs: number;
 }
 
+/**
+ * A single "somebody else is here too" light. Scheduled by Scene after
+ * the user's own ritual ends — each one represents a real (or ambient
+ * synthetic) tap somewhere in the world, rendered as a quiet bloom on
+ * its country. No camera movement, no flash, just a small presence.
+ */
+export interface Witness {
+  id: string;
+  country: string;
+  /** Wall-clock moment at which this bloom should begin (Date.now()). */
+  appearAt: number;
+}
+
+// Witness bloom lifecycle (ms since appearAt). Must stay in sync with
+// WITNESS_LIFETIME_MS in Scene.tsx — Scene uses the total to GC the
+// list. The tail is intentionally long: at ~160s rotation, a light
+// born on the back of the globe has ~20s of fade time to rotate into
+// view, so you don't miss as many as you would with a 5s pop.
+const WITNESS_RISE_MS = 1500;
+const WITNESS_HOLD_MS = 6000;
+const WITNESS_FADE_MS = 20000;
+
 type Props = {
   size?: number;
   ritual?: Ritual | null;
+  witnesses?: ReadonlyArray<Witness>;
 };
 
 // ------ constants ------
@@ -451,7 +474,11 @@ type ActiveRitual = {
 
 // ------ component ------
 
-export default function Earth({ size = 320, ritual = null }: Props) {
+export default function Earth({
+  size = 320,
+  ritual = null,
+  witnesses,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Rotation is `baseRot(t) + rotOffset`. The ritual temporarily takes
@@ -459,6 +486,39 @@ export default function Earth({ size = 320, ritual = null }: Props) {
   // loop picks up exactly where the ritual stopped — no visible jump.
   const rotOffsetRef = useRef(0);
   const activeRef = useRef<ActiveRitual | null>(null);
+
+  // Witnesses are published to the draw loop via a ref so new ones
+  // arriving don't tear down the canvas effect. The draw loop reads
+  // `witnessesRef.current` every frame, so state changes propagate
+  // immediately without re-mount.
+  const witnessesRef = useRef<ReadonlyArray<Witness>>([]);
+  // Jittered land positions per witness id, computed once and cached.
+  // Keeps two witnesses in the same country from stacking on the same
+  // pixel, and keeps the geometry stable across frames.
+  const witnessPosRef = useRef<Map<string, [number, number]>>(new Map());
+
+  useEffect(() => {
+    const list = witnesses ?? [];
+    witnessesRef.current = list;
+    const posMap = witnessPosRef.current;
+    const alive = new Set<string>();
+    for (const w of list) {
+      alive.add(w.id);
+      if (posMap.has(w.id)) continue;
+      const base = COUNTRY_COORDS[w.country];
+      if (!base) continue;
+      // `appearAt` salts the seed so two witnesses in the same country
+      // at different moments don't land on exactly the same jittered
+      // spot — the "lights of a city" look has to come from real
+      // spread, not from identical geometry.
+      const seed = seedFor(w.appearAt, w.country);
+      posMap.set(w.id, findLandJitter(seed, base, 6, 10));
+    }
+    // Drop cached positions for witnesses that have aged out.
+    for (const key of Array.from(posMap.keys())) {
+      if (!alive.has(key)) posMap.delete(key);
+    }
+  }, [witnesses]);
 
   // When a new ritual arrives, compute its full plan (rotStart, rotEnd,
   // per-country light-up times, jittered positions) and publish to the
@@ -807,6 +867,93 @@ export default function Earth({ size = 320, ritual = null }: Props) {
             ctx.fill();
 
             ctx.fillStyle = `rgba(${color}, ${intensity.toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // ------ witness lights ------
+      // After the user's own ritual ends, these are the taps happening
+      // elsewhere right now. Each rises over 1.5s, holds for 6s, then
+      // fades over 20s. Intentionally smaller and cooler than ritual
+      // lights — witnesses, not the center of anything. No camera
+      // movement, so a point born on the back of the globe is simply
+      // unseen until the idle rotation carries it round.
+      {
+        const list = witnessesRef.current;
+        if (list.length > 0) {
+          const posMap = witnessPosRef.current;
+          const WITNESS_TOTAL =
+            WITNESS_RISE_MS + WITNESS_HOLD_MS + WITNESS_FADE_MS;
+          for (const w of list) {
+            const age = realNow - w.appearAt;
+            if (age < 0 || age > WITNESS_TOTAL) continue;
+            // Envelope: rise (linear) → hold → fade (linear-ish).
+            let env: number;
+            if (age < WITNESS_RISE_MS) {
+              env = age / WITNESS_RISE_MS;
+            } else if (age < WITNESS_RISE_MS + WITNESS_HOLD_MS) {
+              env = 1;
+            } else {
+              const fa = age - WITNESS_RISE_MS - WITNESS_HOLD_MS;
+              env = Math.max(0, 1 - fa / WITNESS_FADE_MS);
+            }
+            if (env <= 0) continue;
+
+            const pos = posMap.get(w.id);
+            if (!pos) continue;
+
+            const wv = latLonToVec(pos[0], pos[1]);
+            const x1 = wv[0] * cosR + wv[2] * sinR;
+            const y1 = wv[1];
+            const z1 = -wv[0] * sinR + wv[2] * cosR;
+            const rx = x1 * COS_T - y1 * SIN_T;
+            const ry = x1 * SIN_T + y1 * COS_T;
+            const rz = z1;
+            if (rz < 0) continue;
+
+            const sx = cx + R * rx;
+            const sy = cy - R * ry;
+
+            // Limb fade so points near the silhouette don't punch too
+            // hard. Gentler than ritual lights' limb curve — witnesses
+            // should feel absorbed into the world, not lit onto it.
+            const limb = Math.max(0, rz);
+            const intensity = env * (0.38 + 0.62 * limb);
+            if (intensity < 0.01) continue;
+
+            const glowR = 5.5 * dpr;
+            const coreR = 1.35 * dpr;
+            // Cool pale blue — distinct from the ritual's warm
+            // primary (amber) and chorus (near-white), so a viewer
+            // who caught the ritual reads these as "other people."
+            const color = "198, 220, 238";
+
+            const grad = ctx.createRadialGradient(
+              sx,
+              sy,
+              0,
+              sx,
+              sy,
+              glowR,
+            );
+            grad.addColorStop(
+              0,
+              `rgba(${color}, ${(0.7 * intensity).toFixed(3)})`,
+            );
+            grad.addColorStop(
+              0.4,
+              `rgba(${color}, ${(0.26 * intensity).toFixed(3)})`,
+            );
+            grad.addColorStop(1, `rgba(${color}, 0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = `rgba(${color}, ${(0.82 * intensity).toFixed(3)})`;
             ctx.beginPath();
             ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
             ctx.fill();

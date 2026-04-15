@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Earth, { type Ritual } from "./Earth";
+import Earth, { type Ritual, type Witness } from "./Earth";
 import Starfield from "./Starfield";
 import TapButton from "./TapButton";
 import Grain from "./Grain";
@@ -21,6 +21,32 @@ type TapResponse = {
   recent5m?: number;
   recentCountries?: string[];
 };
+
+type WitnessResponse = {
+  taps: { country: string; createdAtMs: number }[];
+  now: number;
+};
+
+// ---- Witness mode timing ----
+// After the user's own ritual ends, the client polls /api/witness to
+// find out where else in the world people are tapping, and lights each
+// one up as a small, slow bloom on the globe. This is the "我们在一起"
+// part of the experience — you tapped, now you sit and witness others.
+const WITNESS_POLL_MS = 5_000;
+// Each returned tap is scheduled somewhere inside this window after
+// receipt, proportional to its real timestamp, so a batch never blooms
+// all at once. "万家灯火各有各的 rhythm" — each point has its own beat.
+const WITNESS_STAGGER_MS = 4_500;
+// Minimum spacing and small jitter so two taps at the same server
+// moment don't land on exactly the same client tick.
+const WITNESS_MIN_DELAY_MS = 200;
+const WITNESS_JITTER_MS = 600;
+// How long each bloom lives (total). Must match Earth.tsx.
+const WITNESS_LIFETIME_MS = 27_500;
+
+function rand(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
 
 // ---- Ritual timing ----
 // After the user taps, the phrase wisps into the earth and the ritual
@@ -45,6 +71,12 @@ export default function Scene({ lang }: { lang: Lang }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [ritual, setRitual] = useState<Ritual | null>(null);
   const [flashAt, setFlashAt] = useState<number | null>(null);
+  const [witnesses, setWitnesses] = useState<Witness[]>([]);
+  // When the user's ritual has resolved and witness mode begins. Null
+  // before the tap — polling only starts after the user has been seen
+  // themselves, so the emotional order is "you are heard" first, then
+  // "you can hear others."
+  const [witnessActiveAt, setWitnessActiveAt] = useState<number | null>(null);
   // Earth canvas size — picked once at mount from viewport width so it
   // never overflows on narrow phones. Includes margin for the moon orbit.
   const [earthSize, setEarthSize] = useState(340);
@@ -137,11 +169,138 @@ export default function Scene({ lang }: { lang: Lang }) {
       // Let Earth drive the ritual off the canvas. Once the fade has
       // settled, clear the ritual so the component returns to its idle
       // loop — the rotation keeps rolling, no highlights, no snap.
+      // At the same moment, flip into witness mode: the globe stops
+      // being about the user and starts being about everyone else.
       setTimeout(() => {
         setRitual(null);
+        setWitnessActiveAt(Date.now());
       }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS + 400);
     }, DISSOLVE_MS);
   }
+
+  // Witness stream. Polls /api/witness every few seconds; each returned
+  // tap is scheduled to bloom at an offset proportional to its real
+  // server timestamp within the polling window — so a burst of 3 real
+  // taps in one interval blooms spread out over 5s rather than in
+  // lockstep on every 5th second. The server also mixes in ambient
+  // synthetic taps at a slow steady cadence when real traffic is
+  // sparse (see WITNESS_AMBIENT env var), so the globe has a pulse
+  // even on a quiet day.
+  useEffect(() => {
+    if (witnessActiveAt == null) return;
+
+    // Anchor the "since" cursor to the server's clock, not ours —
+    // each /api/witness response returns the server's `now`, which
+    // becomes the next poll's `since`. This keeps client/server drift
+    // from ever causing a dropped or duplicated event.
+    let serverSince = witnessActiveAt;
+    const pendingTimers = new Set<number>();
+    let intervalId: number | null = null;
+    let inFlight = false;
+
+    async function poll() {
+      if (document.hidden) return;
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fetch(`/api/witness?since=${serverSince}`);
+        if (!res.ok) return;
+        const data: WitnessResponse = await res.json();
+        const windowStart = serverSince;
+        const windowEnd = data.now;
+        serverSince = windowEnd;
+        const span = Math.max(1, windowEnd - windowStart);
+
+        for (const tap of data.taps) {
+          // Map server timestamp → client delay. A tap that happened
+          // right at windowStart blooms almost immediately; one near
+          // windowEnd waits close to a full STAGGER window. Jitter
+          // keeps two "simultaneous" taps from visually colliding.
+          const rel = Math.max(
+            0,
+            Math.min(1, (tap.createdAtMs - windowStart) / span),
+          );
+          const delay =
+            WITNESS_MIN_DELAY_MS +
+            rel * WITNESS_STAGGER_MS +
+            rand(0, WITNESS_JITTER_MS);
+          const id = `${tap.country}-${tap.createdAtMs}`;
+          const timer = window.setTimeout(() => {
+            pendingTimers.delete(timer);
+            setWitnesses((prev) => {
+              if (prev.some((w) => w.id === id)) return prev;
+              const next = prev.concat({
+                id,
+                country: tap.country,
+                appearAt: Date.now(),
+              });
+              // Drop anything that's already past its lifetime so the
+              // list doesn't grow unbounded on long sessions.
+              const cutoff = Date.now() - WITNESS_LIFETIME_MS;
+              return next.filter((w) => w.appearAt > cutoff);
+            });
+          }, delay);
+          pendingTimers.add(timer);
+        }
+      } catch {
+        // Swallow — we'll try again on the next interval.
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    function start() {
+      if (intervalId != null) return;
+      // Skip the instant first poll: the server might still return
+      // stale events from just-before the ritual ended, and we don't
+      // want a flurry right at the handoff. Let the first interval
+      // tick naturally.
+      intervalId = window.setInterval(poll, WITNESS_POLL_MS);
+    }
+    function stop() {
+      if (intervalId != null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    }
+
+    start();
+
+    const onVis = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        // Don't flood with everything that happened while hidden —
+        // reset the cursor so we only bloom events from here forward.
+        serverSince = Date.now();
+        start();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      stop();
+      pendingTimers.forEach((t) => window.clearTimeout(t));
+      pendingTimers.clear();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [witnessActiveAt]);
+
+  // GC: drop witnesses whose blooms have finished. Separate from the
+  // poll loop so it ticks even when no new taps are arriving, keeping
+  // the prop stable-small for Earth.
+  useEffect(() => {
+    if (witnessActiveAt == null) return;
+    const id = window.setInterval(() => {
+      const cutoff = Date.now() - WITNESS_LIFETIME_MS;
+      setWitnesses((prev) =>
+        prev.some((w) => w.appearAt <= cutoff)
+          ? prev.filter((w) => w.appearAt > cutoff)
+          : prev,
+      );
+    }, 3_000);
+    return () => window.clearInterval(id);
+  }, [witnessActiveAt]);
 
   const stagger = phraseIsStaggered(lang);
 
@@ -151,7 +310,7 @@ export default function Scene({ lang }: { lang: Lang }) {
       <div className="sun-glow" aria-hidden="true" />
       <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
-          <Earth size={earthSize} ritual={ritual} />
+          <Earth size={earthSize} ritual={ritual} witnesses={witnesses} />
         </div>
 
         <h1

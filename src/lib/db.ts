@@ -113,6 +113,112 @@ export function recentCount(windowMs: number): number {
   return n + mockCount(now);
 }
 
+/**
+ * Real taps in the window (sinceMs, nowMs], oldest first. Used by the
+ * witness stream so the client can bloom each point at (or close to)
+ * its actual wall-clock moment. Unlike the functions above, this does
+ * NOT mix in the mock baseline — those are layered by
+ * `synthesizeAmbientTaps` as deterministic events so repeated polls
+ * return consistent timestamps.
+ */
+export function tapsSince(
+  sinceMs: number,
+  nowMs: number,
+): { country: string; createdAtMs: number }[] {
+  prune(nowMs);
+  const arr = store();
+  const out: { country: string; createdAtMs: number }[] = [];
+  for (const r of arr) {
+    if (r.createdAtMs <= sinceMs) continue;
+    if (r.createdAtMs > nowMs) continue;
+    if (!r.country) continue;
+    out.push({ country: r.country, createdAtMs: r.createdAtMs });
+  }
+  return out;
+}
+
+/**
+ * Synthetic "someone else, somewhere else" taps that fire at a steady
+ * slow cadence so the witness view never feels dead in low-traffic
+ * windows. Deterministic in wall-clock time — two polls that overlap
+ * the same interval return the same events with the same timestamps,
+ * so the client can't double-count and nothing is ever missed if a
+ * poll is delayed by network lag.
+ *
+ * Cadence is intentionally slower than real tap rates: if the world
+ * is actually busy, real taps dominate; when it's quiet, the ambient
+ * pulse carries the "万家灯火" feeling at its own slow rhythm.
+ */
+const AMBIENT_CADENCE_MS = 22_000;
+// Real-traffic threshold for `auto` mode. If at least this many real
+// taps happened in the last AMBIENT_TRAFFIC_WINDOW_MS, the world is
+// busy enough to carry itself and we stop emitting ambient events.
+// Below the threshold, ambient fires at full cadence. Intentionally a
+// step function rather than a smooth ramp — once real traffic arrives
+// the ambient quietly steps aside, and if traffic ebbs we step back in.
+const AMBIENT_REAL_THRESHOLD = 4;
+const AMBIENT_TRAFFIC_WINDOW_MS = 90_000;
+
+function ambientCountryAt(boundaryMs: number): string {
+  // Simple integer hash of the boundary timestamp → index into
+  // MOCK_COUNTRIES. Picks a country in a non-repeating-looking order.
+  // Using xorshift-ish mixing because (ts % n) cycles predictably.
+  let x = (boundaryMs / AMBIENT_CADENCE_MS) | 0;
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  const idx = Math.abs(x) % MOCK_COUNTRIES.length;
+  return MOCK_COUNTRIES[idx];
+}
+
+/**
+ * Should ambient events fire right now? Three modes, read fresh on
+ * every request so toggling the env var on a live deployment takes
+ * effect on the next poll without a redeploy (Vercel env var changes
+ * do need a redeploy, but setting via platform UI is still simpler
+ * than shipping code).
+ *
+ *   WITNESS_AMBIENT=on    → always emit ambient (force warm)
+ *   WITNESS_AMBIENT=off   → never emit ambient (force honest/empty)
+ *   WITNESS_AMBIENT=auto  → emit when real traffic is too sparse
+ *                           to carry the experience on its own
+ *                           (default)
+ */
+export function ambientEnabled(nowMs: number): boolean {
+  const mode = (process.env.WITNESS_AMBIENT ?? "auto").toLowerCase();
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  // auto: count real taps in the trailing window. Walk backwards —
+  // records are chronological, so we can stop as soon as we pass the
+  // cutoff.
+  const arr = store();
+  const cutoff = nowMs - AMBIENT_TRAFFIC_WINDOW_MS;
+  let real = 0;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].createdAtMs < cutoff) break;
+    if (arr[i].country) real++;
+    if (real >= AMBIENT_REAL_THRESHOLD) return false;
+  }
+  return true;
+}
+
+export function synthesizeAmbientTaps(
+  sinceMs: number,
+  nowMs: number,
+): { country: string; createdAtMs: number }[] {
+  if (!ambientEnabled(nowMs)) return [];
+  const out: { country: string; createdAtMs: number }[] = [];
+  // First cadence boundary strictly greater than sinceMs.
+  let t =
+    Math.floor(sinceMs / AMBIENT_CADENCE_MS) * AMBIENT_CADENCE_MS +
+    AMBIENT_CADENCE_MS;
+  while (t <= nowMs) {
+    out.push({ country: ambientCountryAt(t), createdAtMs: t });
+    t += AMBIENT_CADENCE_MS;
+  }
+  return out;
+}
+
 /** Distinct country codes tapped within the window, most-recent first.
  *  Nulls (taps with no detected country) are excluded. Real taps lead,
  *  mock countries fill in underneath so there's always a chorus. */
