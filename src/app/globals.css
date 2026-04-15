@@ -512,9 +512,9 @@ body {
     ),
     radial-gradient(
       closest-side,
-      rgba(var(--ghost-hue), 0.14) 0%,
-      rgba(var(--ghost-hue), 0.1) 35%,
-      rgba(var(--ghost-hue), 0.05) 60%,
+      rgba(var(--ghost-hue), var(--anchor-core, 0.14)) 0%,
+      rgba(var(--ghost-hue), calc(var(--anchor-core, 0.14) * 0.7)) 35%,
+      rgba(var(--ghost-hue), calc(var(--anchor-core, 0.14) * 0.35)) 60%,
       transparent 85%
     );
 }

@@ -61,13 +61,13 @@ const SUN_CYCLE_MS = 153_000;
 // which felt like it overstayed.
 const FLARE_WINDOW_START = 9;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
-// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 60.4 → 14.4% past
-// peak → ~22s fade past zenith. The shape of the fade (see the
+// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 65.6 → 19.6% past
+// peak → ~30s fade past zenith. The shape of the fade (see the
 // envelope calc below) drops quickly at first then settles into a
 // long slow tail, so "mostly gone" happens around half the window
 // and "completely gone" only at the very end — reads as the flare
 // losing energy gradually rather than snapping off.
-const FLARE_WINDOW_END = 60.4;
+const FLARE_WINDOW_END = 65.6;
 
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
@@ -296,6 +296,18 @@ export default function SunFlare() {
           `translate(${gx.toFixed(2)}vw, ${gy.toFixed(2)}vh) ` +
           `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
         el.style.opacity = Math.max(0, Math.min(1, alpha)).toFixed(3);
+
+        // The anchor's core fill alpha tracks defocus. Off-axis it's
+        // a hollow donut (correct for an iris reflection caught on
+        // the aperture edge). On-axis, the whole aperture is lit
+        // dead-on and the reflection forms through the full opening
+        // — donut collapses into a filled iris bloom. Without this,
+        // the anchor at peak still reads as a ring, which contradicts
+        // the physics the rest of the chain obeys.
+        if (g.kind === "anchor") {
+          const coreAlpha = 0.05 + defocus * 0.55;
+          el.style.setProperty("--anchor-core", coreAlpha.toFixed(3));
+        }
       }
 
       // Diffraction starburst — the 4-pointed spike pattern a
