@@ -55,6 +55,41 @@ const MOCK_TAPS: ReadonlyArray<readonly [string, number]> = [
 const MOCK_BASE_COUNT = MOCK_TAPS.reduce((s, [, n]) => s + n, 0);
 const MOCK_COUNTRIES = MOCK_TAPS.map(([c]) => c);
 
+// Cumulative weight table for population-weighted country picking. Built
+// once at module load so the simulator can pick a country in O(log n)
+// per event without re-summing weights. Index i covers the half-open
+// range [cum[i-1], cum[i]).
+const MOCK_CUM: number[] = (() => {
+  const arr: number[] = [];
+  let s = 0;
+  for (const [, n] of MOCK_TAPS) {
+    s += n;
+    arr.push(s);
+  }
+  return arr;
+})();
+const MOCK_WEIGHT_TOTAL = MOCK_CUM[MOCK_CUM.length - 1];
+
+/**
+ * Pick a country whose probability is proportional to its MOCK_TAPS
+ * weight — roughly population-weighted, so CN/US/IN show up far more
+ * often than small countries, and polar-heavy countries (RU, etc.)
+ * stay rarer. Deterministic on `roll`, which is expected to be a
+ * number hashed from a wall-clock boundary.
+ */
+function weightedCountryPick(roll: number): string {
+  // Map roll to [0, MOCK_WEIGHT_TOTAL) — Math.abs handles negative
+  // xorshift outputs, the modulo keeps things integer-stable across
+  // platforms.
+  const target = Math.abs(roll) % MOCK_WEIGHT_TOTAL;
+  // Linear search is fine at 36 entries; a binary search would save
+  // 3-4 comparisons per event, not worth the code.
+  for (let i = 0; i < MOCK_CUM.length; i++) {
+    if (target < MOCK_CUM[i]) return MOCK_COUNTRIES[i];
+  }
+  return MOCK_COUNTRIES[MOCK_COUNTRIES.length - 1];
+}
+
 /** Gentle ±10 fluctuation over a ~7-minute cycle so the number feels
  *  like it's breathing instead of frozen. Deterministic on wall clock. */
 function mockCount(now: number): number {
@@ -160,15 +195,15 @@ const AMBIENT_REAL_THRESHOLD = 4;
 const AMBIENT_TRAFFIC_WINDOW_MS = 90_000;
 
 function ambientCountryAt(boundaryMs: number): string {
-  // Simple integer hash of the boundary timestamp → index into
-  // MOCK_COUNTRIES. Picks a country in a non-repeating-looking order.
-  // Using xorshift-ish mixing because (ts % n) cycles predictably.
+  // Simple integer hash of the boundary timestamp → population-weighted
+  // country pick. Using xorshift-ish mixing because (ts % n) cycles
+  // predictably. Weighted picking means a quiet day still reflects
+  // real-world distribution instead of uniformly cycling 36 countries.
   let x = (boundaryMs / AMBIENT_CADENCE_MS) | 0;
   x ^= x << 13;
   x ^= x >>> 17;
   x ^= x << 5;
-  const idx = Math.abs(x) % MOCK_COUNTRIES.length;
-  return MOCK_COUNTRIES[idx];
+  return weightedCountryPick(x);
 }
 
 /**
@@ -256,16 +291,16 @@ function simulateQps(override?: number): number {
 }
 
 function simulatedCountryAt(boundaryMs: number): string {
-  // Same xorshift hash style as ambientCountryAt, with a different
-  // seed multiplier so the simulated stream doesn't visibly correlate
-  // with the ambient one (matters only if both are running — they
-  // don't in practice, but keeping them de-correlated is cheap).
+  // xorshift hash → population-weighted pick. Different seed multiplier
+  // from ambientCountryAt so the two streams don't visibly correlate.
+  // Weighted picking (vs uniform) makes the globe read as realistic:
+  // CN/US/IN dominate, small countries appear occasionally, polar-heavy
+  // countries (RU) stay correspondingly rarer.
   let x = ((boundaryMs * 9973) ^ 0xdeadbeef) | 0;
   x ^= x << 13;
   x ^= x >>> 17;
   x ^= x << 5;
-  const idx = Math.abs(x) % MOCK_COUNTRIES.length;
-  return MOCK_COUNTRIES[idx];
+  return weightedCountryPick(x);
 }
 
 export function synthesizeSimulatedTaps(

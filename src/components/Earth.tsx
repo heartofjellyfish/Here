@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { COUNTRY_COORDS } from "@/lib/countries";
+import { COUNTRY_COORDS, POP_HOTSPOTS } from "@/lib/countries";
 
 /**
  * A single "resonance ritual" dispatched by Scene after a tap. Earth
@@ -444,6 +444,73 @@ function findLandJitter(
   return [base[0], base[1]];
 }
 
+/**
+ * Pick a population center for the given country if we know any, then
+ * add a small jitter so clusters don't stack pixel-on-pixel. Falls
+ * back to centroid-based jitter for countries without a hotspot table.
+ *
+ * Why: a naive centroid + big jitter on China spreads points from Tibet
+ * to the coast, which reads wrong — real density sits east of the Hu
+ * Line. Same story for Russia (west of the Urals), Canada (along the
+ * US border), Australia (coastal ring), etc. Hotspots concentrate the
+ * simulated "万家灯火" onto places where people actually live, so the
+ * globe lights up in a pattern that matches a night-side satellite
+ * photo instead of a uniform country shape.
+ *
+ * The hotspot is picked deterministically from the seed (weighted by
+ * each city's rough population share), then perturbed by ~0.4° (~45km
+ * at the equator) so two taps in the same city don't collapse to one
+ * pixel. We verify land because some coastal hotspots (Hong Kong,
+ * Miami) can land just offshore after jitter.
+ */
+function findPopulationWeightedJitter(
+  seed: number,
+  country: string,
+): [number, number] {
+  const hotspots = POP_HOTSPOTS[country];
+  if (!hotspots || hotspots.length === 0) {
+    const base = COUNTRY_COORDS[country];
+    if (!base) return [0, 0];
+    return findLandJitter(seed, base, 6, 10);
+  }
+  // Weighted pick. Total weight is small (O(10-20 cities), sums of
+  // small integers), so a fresh scan per call is cheap and we avoid
+  // caching state per-country.
+  let total = 0;
+  for (const h of hotspots) total += h[2];
+  // Mix the seed so adjacent appearAts don't pick adjacent hotspots.
+  const mix = Math.sin(seed * 0.61803398875) * 43758.5453;
+  const roll = (mix - Math.floor(mix)) * total;
+  let acc = 0;
+  let chosen = hotspots[0];
+  for (const h of hotspots) {
+    acc += h[2];
+    if (roll < acc) {
+      chosen = h;
+      break;
+    }
+  }
+  const [cLat, cLon] = [chosen[0], chosen[1]];
+  // Tight jitter — we want "somewhere in this metro," not "somewhere
+  // in this country." 0.4° ≈ 45km at the equator, less at higher
+  // latitudes; metro areas are usually larger than that.
+  let sLat = 0.4;
+  let sLon = 0.4;
+  let s = seed;
+  for (let i = 0; i < 4; i++) {
+    const [dLat, dLon] = jitterFor(s, sLat, sLon);
+    const lat = cLat + dLat;
+    const lon = cLon + dLon;
+    if (isLand(lat, lon)) return [lat, lon];
+    sLat *= 0.6;
+    sLon *= 0.6;
+    s = (s + 1337) | 0;
+  }
+  // Hotspots are authored on land; falling back to the unperturbed
+  // hotspot is fine.
+  return [cLat, cLon];
+}
+
 /** Stable per-(ritual, country) seed so geometry and render agree. */
 function seedFor(startAt: number, country: string): number {
   let h = 0;
@@ -526,14 +593,15 @@ export default function Earth({
     for (const w of list) {
       alive.add(w.id);
       if (posMap.has(w.id)) continue;
-      const base = COUNTRY_COORDS[w.country];
-      if (!base) continue;
+      if (!COUNTRY_COORDS[w.country]) continue;
       // `appearAt` salts the seed so two witnesses in the same country
       // at different moments don't land on exactly the same jittered
       // spot — the "lights of a city" look has to come from real
-      // spread, not from identical geometry.
+      // spread, not from identical geometry. Population-weighted
+      // placement means the spread matches where people actually live
+      // (coastal China, not Tibet), not the country's geometric area.
       const seed = seedFor(w.appearAt, w.country);
-      posMap.set(w.id, findLandJitter(seed, base, 6, 10));
+      posMap.set(w.id, findPopulationWeightedJitter(seed, w.country));
     }
     // Drop cached positions for witnesses that have aged out.
     for (const key of Array.from(posMap.keys())) {
