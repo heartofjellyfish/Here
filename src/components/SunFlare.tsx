@@ -362,7 +362,17 @@ export default function SunFlare() {
         const wobble =
           0.9 + 0.1 * Math.sin(g.alphaPhase + cyclePct * 0.14);
 
-        const alpha = globalAlpha * wobble;
+        // Defocus gain on alpha: reflections "gather" more light when
+        // the source is near the optical axis — same photons funnel
+        // through a tighter bundle of reflection paths, so the ghosts
+        // read noticeably brighter at center-crossing. Off-axis (far
+        // from center) this stays at 1.0; on-axis it boosts 1.6×. The
+        // sun itself also brightens at center (atmospheric extinction
+        // is minimal when it's overhead), so the ghosts tracking that
+        // crescendo is physically consistent.
+        const centerGain = 1 + defocus * 0.6;
+
+        const alpha = globalAlpha * wobble * centerGain;
 
         // Two translates: first offset into the viewport via
         // vw/vh, then center the element on its own origin with
@@ -382,7 +392,14 @@ export default function SunFlare() {
         // the anchor at peak still reads as a ring, which contradicts
         // the physics the rest of the chain obeys.
         if (g.kind === "anchor") {
-          const coreAlpha = 0.05 + defocus * 0.55;
+          // Core fill tracks defocus: at dead-center the whole aperture
+          // is lit on-axis and the reflection forms through the full
+          // opening → the donut collapses into a nearly solid iris
+          // bloom. Coefficient bumped from 0.55 to 0.9 so peak reads
+          // as "filled disc with a faint rim" instead of "half-lit
+          // donut". Off-axis it still hollows out to 0.05, preserving
+          // the ring read when the sun is far from center.
+          const coreAlpha = 0.05 + defocus * 0.9;
           el.style.setProperty("--anchor-core", coreAlpha.toFixed(3));
         }
       }
