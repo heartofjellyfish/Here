@@ -52,14 +52,15 @@ const STAR_COUNT = 90;
 // The sky never quite goes back to how sparse it was.
 const FLASH_STAR_COUNT = 60;
 // The burst class stays applied long enough for the decay to feel like
-// a long exhale rather than a snap off. By the time it lifts, each star
-// is already riding its new, slightly-warmer baseline — so the
-// handback to the regular twinkle is a continuous motion, not a step.
-const FLASH_MS = 3500;
-// Permanent boost to each star's twinkle range after the tap. Subtle:
-// the point is "the sky feels a little warmer now," not "the sky got
-// notably lit up."
-const WARM_BOOST = 1.4;
+// a long exhale rather than a snap off. 5.5s is deliberate: the peak
+// happens in the first ~600ms, leaving the remaining ~4.9s as a
+// single, slowly-resolving approach to each star's warmed baseline.
+const FLASH_MS = 5500;
+// Permanent boost to each star's twinkle range after the tap. Sets the
+// baseline the ordinary sky lives at for the rest of the session.
+// The previous 1.4 read as "a bit warmer"; 1.8 reads as "noticeably
+// brighter than before" without crossing into "the sky is lit up."
+const WARM_BOOST = 1.8;
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);

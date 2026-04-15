@@ -150,47 +150,35 @@ body {
 }
 
 .starfield--flashing .star {
-  animation: starFlashBurst 3500ms cubic-bezier(0.2, 0.85, 0.3, 1) forwards;
+  animation: starFlashBurst 5500ms ease-out forwards;
 }
 
-/* 3.5-second bloom:
-     0–7%    rise fast to peak (stars pop)
-     7–20%   sustain near-full brightness — the "cheer"
-     20–55%  slow fall; still well above baseline
-     55–100% long, gentle settle onto the (boosted) twinkle baseline —
-             never reaches 0, never snaps. The handback to the regular
-             twinkle animation finds each star already at its new floor,
-             so there's no visible step. */
+/* 5.5-second bloom. The earlier version mapped a full, many-keyframe
+   decay curve by hand; it peaked beautifully but the tail had tiny
+   upward bumps for brighter stars (intermediate fixed opacities could
+   drop below the final --star-max). Now we keep only three shape
+   points: rise, peak sustain, and the warmed baseline — and let the
+   timing function carry the decay. `ease-out` on a long duration
+   produces a rapid early drop from peak followed by a very gentle
+   approach to baseline across the remaining ~4.5 seconds, which is
+   what "慢慢的回归平常" should feel like. The handback to the regular
+   twinkle animation lands on each star's already-warmed floor, so
+   there's no visible step. */
 @keyframes starFlashBurst {
   0% {
     opacity: var(--star-min);
     transform: scale(1);
     filter: none;
   }
-  7% {
+  5% {
     opacity: 1;
     transform: scale(2.5);
     filter: blur(0.6px);
   }
-  20% {
+  11% {
     opacity: 0.96;
     transform: scale(2.1);
     filter: blur(0.5px);
-  }
-  40% {
-    opacity: 0.78;
-    transform: scale(1.7);
-    filter: blur(0.35px);
-  }
-  62% {
-    opacity: 0.55;
-    transform: scale(1.35);
-    filter: blur(0.2px);
-  }
-  82% {
-    opacity: 0.3;
-    transform: scale(1.12);
-    filter: blur(0.08px);
   }
   100% {
     opacity: var(--star-max);
