@@ -182,25 +182,41 @@ body {
   }
 }
 
-/* 14-second bloom. The long tail is the whole point — 94% of duration
-   (~13.2s) is a linear descent from near-peak to each star's warmed
+/* 14-second bloom. The long tail is the whole point — ~89% of duration
+   (~12.5s) is a linear descent from near-peak to each star's warmed
    baseline, so "回归常态" happens imperceptibly slowly. The rise and
-   brief hold are packed into the first ~840ms, then at 6% we switch
-   to linear timing so the decay isn't front-loaded like an ease-out.
-   Per-keyframe `animation-timing-function` overrides the outer timing
-   for the segment starting at that keyframe — standard CSS. */
+   brief hold are spread across the first ~1540ms as an S-curve: an
+   ease-in climb from black to a mid-glow, an ease-out landing onto
+   the peak, then a short hold before the long linear decay. The
+   S-shape is the fix for "有点突然" — a single ease-out segment into
+   the peak started too fast and snapped into the brightest frame, so
+   sweep-to-flash read as a cut rather than a bloom. Splitting the
+   rise in two with opposing curves lets the sky kindle before it
+   blazes. Per-keyframe `animation-timing-function` overrides the
+   outer timing for the segment starting at that keyframe. */
 @keyframes starFlashBurst {
   0% {
     opacity: var(--star-min);
     transform: scale(1);
     filter: none;
+    /* Gentle lift-off: the first half of the rise is slow, so the
+       eye registers a kindling rather than a pop. */
+    animation-timing-function: cubic-bezier(0.45, 0, 0.75, 0.35);
   }
-  3% {
+  4% {
+    opacity: 0.42;
+    transform: scale(1.55);
+    filter: blur(0.3px);
+    /* Ease-out into the peak so the second half of the rise decelerates
+       and arrives at 1.0 like a landing, not a cliff. */
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.55, 1);
+  }
+  8% {
     opacity: 1;
     transform: scale(2.5);
     filter: blur(0.6px);
   }
-  6% {
+  11% {
     opacity: 0.96;
     transform: scale(2.1);
     filter: blur(0.5px);
@@ -223,8 +239,9 @@ body {
    Two stacked asymmetric patches give the layer a non-radial structure,
    which makes the slow rotation/drift visible — without asymmetry,
    rotating a perfectly symmetric radial gradient produces no visible
-   change. The animation cycles over 240s, so on any given glance the
-   warmth seems still; come back later and it has shifted. */
+   change. The animation cycles over 153s (sped up 15% from 180s so the
+   warmth arrives before most users have already tapped), so on any
+   given glance it seems still; come back later and it has shifted. */
 
 .sun-glow {
   /* Box is 180vmax × 180vmax and centered on the viewport by default.
@@ -261,7 +278,12 @@ body {
   );
   opacity: 0;
   filter: blur(3px);
-  animation: sunArc 180s linear infinite;
+  /* 153s = 180s × 0.85. Most users tap within a second or two of
+     landing, and 180s meant they often left before the warmth really
+     arrived. 15% faster brings the rising-light phase forward enough
+     that the sun is meaningfully present by the time they reach for
+     the button, without rushing the arc itself. */
+  animation: sunArc 153s linear infinite;
 }
 
 /* Sun parabolic arc. Translate is in vw/vh so the path stays
@@ -277,7 +299,7 @@ body {
     transform: translate(-80vw, 60vh);
     opacity: 0;
   }
-  /* ~1s in (0.6% of a 180s cycle), the first warm fringe touches
+  /* ~0.9s in (0.6% of a 153s cycle), the first warm fringe touches
      the lower-left corner — the "光缓缓进来" moment. */
   0.6% {
     transform: translate(-79vw, 59vh);
