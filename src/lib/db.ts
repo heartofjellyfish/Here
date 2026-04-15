@@ -225,11 +225,14 @@ export function synthesizeAmbientTaps(
 }
 
 /**
- * Simulated high-rate traffic. When WITNESS_SIMULATE_QPS=N is set, the
- * witness endpoint pretends there are N taps per second coming in from
- * around the world — a stand-in for the real audience we don't have
- * yet. Used to preview what the "万家灯火" effect looks like at busy
- * scale without waiting for organic traffic.
+ * Simulated high-rate traffic. Two ways to turn this on:
+ *   1. Env var WITNESS_SIMULATE_QPS=N  (server-wide, needs redeploy)
+ *   2. Query param ?sim=N on /api/witness  (per-request, instant preview)
+ *
+ * Query param wins when both are set. The query path is the one to
+ * reach for when you want to see what the "万家灯火" effect looks like
+ * right now without touching env config — just visit the site with
+ * `?sim=50` in the URL and the client forwards it on every poll.
  *
  * Deterministic on wall-clock boundaries, same trick as
  * synthesizeAmbientTaps: two overlapping polls return the same events
@@ -240,7 +243,11 @@ export function synthesizeAmbientTaps(
  * floods the client with setTimeouts without adding visible density.
  * Zero or unset means the simulator is off (production default).
  */
-function simulateQps(): number {
+function simulateQps(override?: number): number {
+  if (override !== undefined) {
+    if (!Number.isFinite(override) || override <= 0) return 0;
+    return Math.min(Math.floor(override), 200);
+  }
   const raw = process.env.WITNESS_SIMULATE_QPS;
   if (!raw) return 0;
   const n = parseInt(raw, 10);
@@ -264,8 +271,9 @@ function simulatedCountryAt(boundaryMs: number): string {
 export function synthesizeSimulatedTaps(
   sinceMs: number,
   nowMs: number,
+  qpsOverride?: number,
 ): { country: string; createdAtMs: number }[] {
-  const qps = simulateQps();
+  const qps = simulateQps(qpsOverride);
   if (qps <= 0) return [];
   // 1000/qps gives the gap between adjacent synthetic events. At 50 qps
   // that's 20ms — fine-grained enough that the client's stagger

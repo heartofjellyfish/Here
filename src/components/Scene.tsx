@@ -85,6 +85,17 @@ export default function Scene({ lang }: { lang: Lang }) {
   const earthRef = useRef<HTMLDivElement>(null);
   const phraseRef = useRef<HTMLHeadingElement>(null);
   const tapWrapRef = useRef<HTMLDivElement>(null);
+  // Optional `?sim=50` query param. When present, it's forwarded on
+  // every /api/witness poll so the backend generates simulated high-
+  // rate traffic for this session only. Means you can preview the
+  // busy-globe effect with a URL like `/?sim=50` without touching
+  // env vars. Null when not set → no simulator, production behavior.
+  const simQuery = useRef<string | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const s = p.get("sim");
+    if (s && /^\d+$/.test(s)) simQuery.current = s;
+  }, []);
 
   const copy = COPY[lang];
   const fontClass = langFontClass(lang);
@@ -204,7 +215,12 @@ export default function Scene({ lang }: { lang: Lang }) {
       if (inFlight) return;
       inFlight = true;
       try {
-        const res = await fetch(`/api/witness?since=${serverSince}`);
+        const simParam = simQuery.current
+          ? `&sim=${simQuery.current}`
+          : "";
+        const res = await fetch(
+          `/api/witness?since=${serverSince}${simParam}`,
+        );
         if (!res.ok) return;
         const data: WitnessResponse = await res.json();
         const windowStart = serverSince;

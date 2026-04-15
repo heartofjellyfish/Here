@@ -54,9 +54,18 @@ export async function GET(req: NextRequest) {
     ? Math.max(parsed, lowerBound)
     : lowerBound;
 
+  // Optional per-request simulator override. `?sim=50` turns on 50
+  // synthetic taps/sec for just this response. Useful for previewing
+  // the "万家灯火" effect live without redeploying with an env var —
+  // the client forwards this param from window.location on every poll
+  // when the page was loaded with it.
+  const simRaw = searchParams.get("sim");
+  const simParsed = simRaw ? parseInt(simRaw, 10) : NaN;
+  const simOverride = Number.isFinite(simParsed) ? simParsed : undefined;
+
   const real = tapsSince(since, now);
   const ambient = synthesizeAmbientTaps(since, now);
-  const simulated = synthesizeSimulatedTaps(since, now);
+  const simulated = synthesizeSimulatedTaps(since, now, simOverride);
 
   // Merge by timestamp so the client can stagger them by actual
   // wall-clock ordering without doing its own sort.
