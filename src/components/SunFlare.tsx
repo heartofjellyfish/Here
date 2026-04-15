@@ -153,13 +153,6 @@ type GhostDef = {
 // shimmer the offsets were providing is already covered by the
 // per-ghost alpha wobble and size wobble.
 const GHOSTS: GhostDef[] = [
-  // Two glints on the sun-side of the axis. Physics says most same-
-  // side reflections collapse onto the sun itself, but the one or
-  // two paths that DO resolve as distinct ghosts sit between the sun
-  // and optical center. Having two reinforces the reading that
-  // "the chain is a line starting at the sun" — a single lone glint
-  // far from the others left the near-source end feeling sparse.
-  { t: 0.1, size: 1.3, hue: "255, 250, 225", kind: "glint", blur: 0.4, alphaPhase: 2.8, perpOffset: 0, defocusResponse: 0.2, sizePhase: 1.5 },
   { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0, defocusResponse: 0.25, sizePhase: 0.2 },
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: 0, defocusResponse: 1.4, sizePhase: 2.0 },
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0, defocusResponse: 1.4, sizePhase: 3.3 },
