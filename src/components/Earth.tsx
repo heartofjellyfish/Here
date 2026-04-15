@@ -65,11 +65,27 @@ export type WitnessTiming = {
   fadeMs: number;
 };
 
+/**
+ * The user's own tap, pinned permanently. After the ritual fades, this
+ * takes over as a small persistent amber dot — "你一直在这里" — with a
+ * slow breathing pulse so it feels alive without screaming for
+ * attention. Distinct from witnesses (cool blue, short-lived): this is
+ * warm and always-on.
+ */
+export interface Home {
+  country: string;
+  /** Wall-clock moment the home point was planted — used as the phase
+   *  reference for the breathing pulse so the effect is stable
+   *  per-session instead of sync'd to epoch. */
+  startAt: number;
+}
+
 type Props = {
   size?: number;
   ritual?: Ritual | null;
   witnesses?: ReadonlyArray<Witness>;
   witnessTiming?: WitnessTiming;
+  home?: Home | null;
 };
 
 // ------ constants ------
@@ -557,6 +573,7 @@ export default function Earth({
   ritual = null,
   witnesses,
   witnessTiming,
+  home = null,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -608,6 +625,31 @@ export default function Earth({
       if (!alive.has(key)) posMap.delete(key);
     }
   }, [witnesses]);
+
+  // Home point — the user's own pinned light. Position is resolved
+  // once per (country, startAt) via the same hotspot-aware placement
+  // the witness stream uses, so the user's dot also lands on a real
+  // city rather than a centroid. Cached in a ref so the draw loop can
+  // read it every frame without touching React state.
+  const homeRef = useRef<
+    | { country: string; startAt: number; pos: [number, number] }
+    | null
+  >(null);
+  if (home) {
+    const cur = homeRef.current;
+    const needs =
+      !cur || cur.country !== home.country || cur.startAt !== home.startAt;
+    if (needs && COUNTRY_COORDS[home.country]) {
+      const seed = seedFor(home.startAt, home.country);
+      homeRef.current = {
+        country: home.country,
+        startAt: home.startAt,
+        pos: findPopulationWeightedJitter(seed, home.country),
+      };
+    }
+  } else {
+    homeRef.current = null;
+  }
 
   // When a new ritual arrives, compute its full plan (rotStart, rotEnd,
   // per-country light-up times, jittered positions) and publish to the
@@ -1046,6 +1088,65 @@ export default function Earth({
             ctx.fillStyle = `rgba(${color}, ${(0.82 * intensity).toFixed(3)})`;
             ctx.beginPath();
             ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // ------ home point ------
+      // The user's own tap, pinned. Warm amber (matches the ritual
+      // primary color) with a slow breathing pulse and a second, even
+      // slower halo shimmer — both are one Math.sin per frame each,
+      // so effectively free. Drawn after witnesses so it sits on top
+      // of any witness that happens to land in the same metro.
+      {
+        const h = homeRef.current;
+        if (h) {
+          const wv = latLonToVec(h.pos[0], h.pos[1]);
+          const x1 = wv[0] * cosR + wv[2] * sinR;
+          const y1 = wv[1];
+          const z1 = -wv[0] * sinR + wv[2] * cosR;
+          const rx = x1 * COS_T - y1 * SIN_T;
+          const ry = x1 * SIN_T + y1 * COS_T;
+          const rz = z1;
+          if (rz >= 0) {
+            const sx = cx + R * rx;
+            const sy = cy - R * ry;
+            const limb = Math.max(0, rz);
+            // Breathing: 0.78..1.0 over ~4.2s. Slow enough to read as
+            // a heartbeat, not a blink. Phase referenced to startAt so
+            // two sessions don't sync up coincidentally — feels
+            // personal, not global.
+            const tSec = (realNow - h.startAt) / 1000;
+            const breath = 0.89 + 0.11 * Math.sin(tSec * 1.5);
+            // Halo shimmer: an even slower ±15% wiggle on the outer
+            // glow alpha, decoupled from the core pulse so the light
+            // doesn't read as a single on/off sine.
+            const shimmer = 0.85 + 0.15 * Math.sin(tSec * 0.47 + 1.3);
+            const intensity = breath * (0.55 + 0.45 * limb);
+
+            const glowR = 10 * dpr;
+            const coreR2 = 2.2 * dpr;
+            const color = "255, 232, 205"; // matches ritual primary
+
+            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+            grad.addColorStop(
+              0,
+              `rgba(${color}, ${(0.9 * intensity).toFixed(3)})`,
+            );
+            grad.addColorStop(
+              0.4,
+              `rgba(${color}, ${(0.36 * intensity * shimmer).toFixed(3)})`,
+            );
+            grad.addColorStop(1, `rgba(${color}, 0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = `rgba(${color}, ${intensity.toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, coreR2, 0, Math.PI * 2);
             ctx.fill();
           }
         }

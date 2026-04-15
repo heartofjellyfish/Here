@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Earth, {
+  type Home,
   type Ritual,
   type Witness,
   type WitnessTiming,
@@ -95,6 +96,10 @@ export default function Scene({ lang }: { lang: Lang }) {
   // themselves, so the emotional order is "you are heard" first, then
   // "you can hear others."
   const [witnessActiveAt, setWitnessActiveAt] = useState<number | null>(null);
+  // The user's own tap, pinned as a permanent amber dot once the
+  // ritual fades. Null before the tap; set at the handoff into
+  // witness mode so it inherits the exact moment the ritual ends.
+  const [home, setHome] = useState<Home | null>(null);
   // Earth canvas size — picked once at mount from viewport width so it
   // never overflows on narrow phones. Includes margin for the moon orbit.
   const [earthSize, setEarthSize] = useState(340);
@@ -229,12 +234,19 @@ export default function Scene({ lang }: { lang: Lang }) {
       // Let Earth drive the ritual off the canvas. Once the fade has
       // settled, clear the ritual so the component returns to its idle
       // loop — the rotation keeps rolling, no highlights, no snap.
-      // At the same moment, flip into witness mode: the globe stops
-      // being about the user and starts being about everyone else.
+      // At the same moment, flip into witness mode (the globe stops
+      // being about the user, starts being about everyone else) and
+      // plant the user's home dot so their point stays lit permanently.
+      // No safety buffer after fade — the fade ends cleanly on the
+      // animation clock, waiting longer just reads as a dead beat.
       setTimeout(() => {
         setRitual(null);
-        setWitnessActiveAt(Date.now());
-      }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS + 400);
+        const handoffAt = Date.now();
+        if (primaryCountry) {
+          setHome({ country: primaryCountry, startAt: handoffAt });
+        }
+        setWitnessActiveAt(handoffAt);
+      }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS);
     }, DISSOLVE_MS);
   }
 
@@ -314,10 +326,12 @@ export default function Scene({ lang }: { lang: Lang }) {
 
     function start() {
       if (intervalId != null) return;
-      // Skip the instant first poll: the server might still return
-      // stale events from just-before the ritual ended, and we don't
-      // want a flurry right at the handoff. Let the first interval
-      // tick naturally.
+      // Kick a poll immediately so witness mode begins lighting up
+      // right at the handoff instead of waiting up to 5s for the first
+      // interval tick. Stale events aren't a concern: `serverSince`
+      // was set to the ritual-end moment, so `tapsSince` returns
+      // nothing from before that point.
+      void poll();
       intervalId = window.setInterval(poll, WITNESS_POLL_MS);
     }
     function stop() {
@@ -379,6 +393,7 @@ export default function Scene({ lang }: { lang: Lang }) {
             ritual={ritual}
             witnesses={witnesses}
             witnessTiming={cfg.timing}
+            home={home}
           />
         </div>
 
