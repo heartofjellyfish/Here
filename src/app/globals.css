@@ -103,15 +103,50 @@ body {
     transform: translate(0, 0);
     opacity: 0;
   }
-  10% {
+  8% {
     opacity: var(--meteor-peak, 0.85);
   }
-  85% {
+  92% {
     opacity: var(--meteor-peak, 0.85);
   }
   100% {
-    transform: translate(var(--meteor-travel, 60vmin), 0);
+    /* vmax default so the streak always clears the whole screen,
+       regardless of portrait/landscape orientation. */
+    transform: translate(var(--meteor-travel, 180vmax), 0);
     opacity: 0;
+  }
+}
+
+/* ---------- Universe flash ----------
+   Fired once during the reveal ritual, at the moment the user's own
+   country blooms on the globe. Every star briefly reaches full
+   brightness and scales up, landing back on its usual twinkle. Reads
+   as: the sky itself exhaled with you. */
+
+.starfield--flashing .star {
+  animation: starFlashBurst 1200ms cubic-bezier(0.2, 0.8, 0.35, 1) forwards;
+}
+
+@keyframes starFlashBurst {
+  0% {
+    opacity: var(--star-min);
+    transform: scale(1);
+    filter: none;
+  }
+  16% {
+    opacity: 1;
+    transform: scale(2.4);
+    filter: blur(0.6px);
+  }
+  45% {
+    opacity: 0.75;
+    transform: scale(1.5);
+    filter: blur(0.3px);
+  }
+  100% {
+    opacity: var(--star-max);
+    transform: scale(1);
+    filter: none;
   }
 }
 
@@ -512,9 +547,30 @@ body {
   font-weight: 400;
   letter-spacing: 0.04em;
   color: var(--ink);
+  line-height: 1.5;
 }
 .font-cjk .reveal__ack {
   letter-spacing: 0.14em;
+}
+
+/* Softer vocative on a new line — "my friend." whispered beneath the
+   main acknowledgment. Muted tone so the eye reads it as a quiet rider,
+   not a second statement. */
+.reveal__ack-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+.font-cjk .reveal__ack-sub {
+  letter-spacing: 0.22em;
+  font-style: normal;
+}
+.font-ar .reveal__ack-sub {
+  font-style: normal;
 }
 
 .reveal__resonance {
@@ -539,16 +595,16 @@ body {
   letter-spacing: 0.22em;
 }
 
-/* Staggered reveal timeline (relative to entering "revealed"):
-     0.8s   the user's country lights up on the earth (driven by canvas)
-     1.4s   ack fades in
-     2.8s   resonance fades in
-     4.4s   presence fades in
+/* Reveal timeline (relative to entering "revealed"):
+     0.0s–3.6s   earth sweeps 1.5 turns, lighting countries as it passes
+     3.6s        primary blooms + universe flashes
+     3.8s        ack fades in just after the bloom, so the text lands
+                 as the confirmation rather than stealing the moment
 */
 .stage--revealed .reveal__ack {
   opacity: 0.92;
   transform: none;
-  transition-delay: 1400ms;
+  transition-delay: 3800ms;
 }
 .stage--revealed .reveal__resonance {
   opacity: 1;

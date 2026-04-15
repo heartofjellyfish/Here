@@ -7,7 +7,12 @@ import { useEffect, useRef, useState } from "react";
  *   - ~90 stars, each twinkling on its own 4–10s cycle at a max opacity
  *     that never climbs above "barely noticed."
  *   - Meteors every 22–55s, lasting ~1.6s, at random heights and angles.
- *     Rare enough to feel like something you might miss.
+ *     Rare enough to feel like something you might miss. Each streak
+ *     crosses the whole screen — never a stub that dies in the corner.
+ *
+ * `flashAt` (optional): a Date.now() timestamp. When it crosses, the
+ * entire starfield blooms once — every star briefly full-bright — as if
+ * the sky itself were quietly cheering the person on.
  *
  * No grid, no orbits, no nebula. Black is the main character.
  */
@@ -30,13 +35,17 @@ type Meteor = {
   angleDeg: number;
   durationMs: number;
   lengthPx: number;
-  /** How far the streak travels along its rotated axis, in vmin. */
-  travelVmin: number;
+  /** How far the streak travels along its rotated axis, in vmax.
+   *  vmax (not vmin) guarantees the trail covers the longer screen
+   *  dimension, so streaks read as full crossings regardless of
+   *  portrait/landscape. */
+  travelVmax: number;
   /** Peak opacity — most are faint, a few burn brighter. */
   peakOpacity: number;
 };
 
 const STAR_COUNT = 90;
+const FLASH_MS = 1200;
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -55,11 +64,17 @@ function generateStars(): Star[] {
   }));
 }
 
-export default function Starfield() {
+type Props = {
+  /** Date.now() timestamp at which the starfield should flash once. */
+  flashAt?: number | null;
+};
+
+export default function Starfield({ flashAt = null }: Props) {
   // Generate stars client-side only so SSR markup stays deterministic
   // (no hydration mismatch on Math.random).
   const [stars, setStars] = useState<Star[]>([]);
   const [meteors, setMeteors] = useState<Meteor[]>([]);
+  const [flashing, setFlashing] = useState(false);
   const nextId = useRef(0);
 
   useEffect(() => {
@@ -78,16 +93,19 @@ export default function Starfield() {
       timeoutId = window.setTimeout(() => {
         const id = nextId.current++;
         // Occasional "long burner" — a fifth of meteors are noticeably
-        // longer-tailed and travel further. The rest are short streaks.
+        // longer-tailed and slower-burning. Every meteor still traverses
+        // the full screen; "long burner" just means more prominent.
         const longBurn = Math.random() < 0.22;
         const m: Meteor = {
           id,
           topPct: rand(-6, 62),
           leftPct: rand(-18, 38),
           angleDeg: rand(8, 52),
-          durationMs: longBurn ? rand(2200, 3400) : rand(1100, 2200),
-          lengthPx: longBurn ? rand(220, 340) : rand(110, 220),
-          travelVmin: longBurn ? rand(85, 130) : rand(55, 95),
+          durationMs: longBurn ? rand(2600, 3800) : rand(1600, 2600),
+          lengthPx: longBurn ? rand(260, 380) : rand(150, 260),
+          // 160–220vmax guarantees the head exits the opposite edge
+          // regardless of starting position or angle.
+          travelVmax: longBurn ? rand(180, 230) : rand(150, 200),
           peakOpacity: longBurn ? rand(0.85, 1.0) : rand(0.55, 0.9),
         };
         setMeteors((prev) => [...prev, m]);
@@ -101,8 +119,25 @@ export default function Starfield() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
+  // Universe flash. `flashAt` is a Date.now() moment; we schedule the
+  // class toggle relative to now() so we only ever fire the upcoming
+  // flash, never a replay of a past one (e.g., if the prop is set in
+  // the past by mistake, we fire immediately rather than skipping).
+  useEffect(() => {
+    if (flashAt == null) return;
+    const delay = Math.max(0, flashAt - Date.now());
+    const onTimer = window.setTimeout(() => {
+      setFlashing(true);
+      window.setTimeout(() => setFlashing(false), FLASH_MS);
+    }, delay);
+    return () => window.clearTimeout(onTimer);
+  }, [flashAt]);
+
   return (
-    <div className="starfield" aria-hidden="true">
+    <div
+      className={`starfield${flashing ? " starfield--flashing" : ""}`}
+      aria-hidden="true"
+    >
       {stars.map((s) => (
         <span
           key={s.id}
@@ -137,7 +172,7 @@ export default function Starfield() {
               {
                 width: `${m.lengthPx}px`,
                 animationDuration: `${m.durationMs}ms`,
-                "--meteor-travel": `${m.travelVmin}vmin`,
+                "--meteor-travel": `${m.travelVmax}vmax`,
                 "--meteor-peak": m.peakOpacity.toFixed(3),
               } as React.CSSProperties
             }

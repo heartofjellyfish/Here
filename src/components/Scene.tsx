@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Earth, { type EarthHighlight } from "./Earth";
+import Earth, { type Ritual } from "./Earth";
 import Starfield from "./Starfield";
 import TapButton from "./TapButton";
 import Grain from "./Grain";
@@ -22,20 +22,22 @@ type TapResponse = {
   recentCountries?: string[];
 };
 
-const DISSOLVE_MS = 2400;
-/**
- * How long to wait, after the highlight array is set, before the glow
- * actually renders. The Earth kicks off its rotation snap the moment a
- * new primary highlight appears, so scheduling `startedAt` this far in
- * the future means the camera finishes sweeping to the country *before*
- * the light blooms — you see the point get lit, not arrive already-lit.
- * Tuned against the snap easing (0.05/frame → ~98.6% settled by 1400ms).
- */
-const ROTATION_SETTLE_MS = 1400;
+// ---- Ritual timing ----
+// After the user taps, the phrase wisps into the earth, the earth
+// performs a one-and-a-half-turn sweep lighting every recent country as
+// it passes beneath the meridian, stops on the user's own country with
+// the brightest point, holds, fades, and resumes rotation. At the same
+// moment the primary point blooms, the whole universe flashes once —
+// the sky, quietly, cheering the person on.
+const DISSOLVE_MS = 1600;
+const SWEEP_MS = 3600;
+const HOLD_MS = 1000;
+const FADE_MS = 800;
 
 export default function Scene({ lang }: { lang: Lang }) {
   const [phase, setPhase] = useState<Phase>("loading");
-  const [highlights, setHighlights] = useState<EarthHighlight[]>([]);
+  const [ritual, setRitual] = useState<Ritual | null>(null);
+  const [flashAt, setFlashAt] = useState<number | null>(null);
   // Earth canvas size — picked once at mount from viewport width so it
   // never overflows on narrow phones. Includes margin for the moon orbit.
   const [earthSize, setEarthSize] = useState(340);
@@ -60,41 +62,6 @@ export default function Scene({ lang }: { lang: Lang }) {
     const s = Math.min(window.innerWidth, window.innerHeight);
     setEarthSize(Math.max(280, Math.min(380, Math.round(s * 0.78))));
   }, []);
-
-  // After reveal, refresh presence + resonance every 45s. No animation on
-  // updates — the earth lights up new countries, the number changes silently.
-  useEffect(() => {
-    if (phase !== "revealed") return;
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const res = await fetch("/api/presence", { cache: "no-store" });
-        const data = (await res.json()) as TapResponse;
-        if (cancelled) return;
-        if (Array.isArray(data.recentCountries)) {
-          setHighlights((prev) => {
-            const primary = prev.find((h) => h.primary);
-            const now = Date.now();
-            const resonance = data.recentCountries!
-              .filter((c) => !primary || c !== primary.country)
-              .map<EarthHighlight>((c, i) => ({
-                country: c,
-                primary: false,
-                startedAt: now + i * 350 + Math.random() * 600,
-              }));
-            return primary ? [primary, ...resonance] : resonance;
-          });
-        }
-      } catch {
-        /* stay quiet */
-      }
-    };
-    const id = setInterval(tick, 45_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [phase]);
 
   // Compute the wisp trajectory from the phrase/button center to the earth
   // center, in pixels. Set as CSS vars so the dissolve animation knows
@@ -129,32 +96,41 @@ export default function Scene({ lang }: { lang: Lang }) {
 
     setTimeout(async () => {
       const data = await tapPromise;
+      const startAt = Date.now();
+      const primaryCountry = data.country ?? null;
 
-      const next: EarthHighlight[] = [];
-      const now = Date.now();
-
-      // Earth rotates to the user's country the moment we hand it the
-      // primary highlight, but we hold off on actually *lighting* it until
-      // the camera has swept into place — otherwise the country arrives
-      // already-lit, robbing the moment of its little "ignition."
-      const litAt = now + ROTATION_SETTLE_MS;
-
-      if (data.country) {
-        next.push({ country: data.country, primary: true, startedAt: litAt });
-      }
+      // Build the country list: primary first (so it leads the render),
+      // then the recent chorus. Earth will compute each country's
+      // light-up time from the sweep geometry.
+      const countries: string[] = [];
+      if (primaryCountry) countries.push(primaryCountry);
       if (data.recentCountries) {
         for (const c of data.recentCountries) {
-          if (data.country && c === data.country) continue;
-          next.push({
-            country: c,
-            primary: false,
-            // Resonance pulses follow the user's own light, staggered.
-            startedAt: litAt + 700 + Math.random() * 1800,
-          });
+          if (primaryCountry && c === primaryCountry) continue;
+          countries.push(c);
         }
       }
-      setHighlights(next);
+
+      setRitual({
+        startAt,
+        primaryCountry,
+        countries,
+        sweepMs: SWEEP_MS,
+        holdMs: HOLD_MS,
+        fadeMs: FADE_MS,
+      });
+      // Universe flash peaks as the primary point blooms (near sweep end).
+      // Scheduling slightly *before* the bloom lets the flash rise and
+      // meet the light instead of following behind it.
+      setFlashAt(startAt + SWEEP_MS - 200);
       setPhase("revealed");
+
+      // Let Earth drive the ritual off the canvas. Once the fade has
+      // settled, clear the ritual so the component returns to its idle
+      // loop — the rotation keeps rolling, no highlights, no snap.
+      setTimeout(() => {
+        setRitual(null);
+      }, SWEEP_MS + HOLD_MS + FADE_MS + 400);
     }, DISSOLVE_MS);
   }
 
@@ -162,11 +138,11 @@ export default function Scene({ lang }: { lang: Lang }) {
 
   return (
     <>
-      <Starfield />
+      <Starfield flashAt={flashAt} />
       <div className="sun-glow" aria-hidden="true" />
       <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
-          <Earth size={earthSize} highlights={highlights} />
+          <Earth size={earthSize} ritual={ritual} />
         </div>
 
         <h1
@@ -203,7 +179,10 @@ export default function Scene({ lang }: { lang: Lang }) {
         </div>
 
         <div className="reveal" role="status" aria-live="polite">
-          <p className="reveal__ack">{copy.ack}</p>
+          <p className="reveal__ack">
+            {copy.ack[0]}
+            <span className="reveal__ack-sub">{copy.ack[1]}</span>
+          </p>
         </div>
       </main>
       <Grain />

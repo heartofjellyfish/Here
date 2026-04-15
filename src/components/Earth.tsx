@@ -3,17 +3,29 @@
 import { useEffect, useRef } from "react";
 import { COUNTRY_COORDS } from "@/lib/countries";
 
-export interface EarthHighlight {
-  country: string;
-  /** The user's own country — stronger, warmer, held longer. */
-  primary: boolean;
-  /** Timestamp (Date.now()) when the pulse should begin. May be in the future. */
-  startedAt: number;
+/**
+ * A single "resonance ritual" dispatched by Scene after a tap. Earth
+ * owns the choreography: a 1.5-turn sweep lighting every country as it
+ * passes the front meridian, stopping on the primary country with its
+ * point at dead center, holding, fading, then seamlessly handing the
+ * earth back to its idle rotation.
+ *
+ * Times are wall-clock (Date.now()) — the outer scheduler and the
+ * canvas loop use the same reference frame. Durations are passed in so
+ * the component doesn't need to know the Scene-side constants.
+ */
+export interface Ritual {
+  startAt: number;
+  primaryCountry: string | null;
+  countries: string[];
+  sweepMs: number;
+  holdMs: number;
+  fadeMs: number;
 }
 
 type Props = {
   size?: number;
-  highlights?: EarthHighlight[];
+  ritual?: Ritual | null;
 };
 
 // ------ constants ------
@@ -341,9 +353,8 @@ function latLonToVec(lat: number, lon: number): [number, number, number] {
 }
 
 /**
- * Deterministic per-highlight jitter. Two taps from the same country show
- * up as two distinct points, not one stacked pile on the country centroid.
- * Seeded by `startedAt` so a given pulse stays put across frames.
+ * Deterministic per-seed jitter. Two taps from the same country show up
+ * as two distinct points, not one stacked pile on the country centroid.
  */
 function jitterFor(
   seed: number,
@@ -358,36 +369,160 @@ function jitterFor(
   ];
 }
 
+/**
+ * Same scheme as jitterFor, but rejects ocean samples. The coastlines
+ * around Jakarta, Tokyo, and the like are tight — jittering a point off
+ * a centroid can land it a few hundred km out to sea, which reads wrong.
+ * We retry with a shrinking scale until we hit land, falling back to
+ * the centroid. 6 attempts is plenty; the worst-case centroid fallback
+ * still looks deliberate because it lands on a real place.
+ */
+function findLandJitter(
+  seed: number,
+  base: readonly [number, number],
+  latMax: number,
+  lonMax: number,
+): [number, number] {
+  let sLat = latMax;
+  let sLon = lonMax;
+  let s = seed;
+  for (let i = 0; i < 6; i++) {
+    const [dLat, dLon] = jitterFor(s, sLat, sLon);
+    const lat = base[0] + dLat;
+    const lon = base[1] + dLon;
+    if (isLand(lat, lon)) return [lat, lon];
+    sLat *= 0.65;
+    sLon *= 0.65;
+    s = (s + 1337) | 0;
+  }
+  // Centroids in COUNTRY_COORDS are authored to be on land, so this
+  // fallback looks fine even without random perturbation.
+  return [base[0], base[1]];
+}
+
+/** Stable per-(ritual, country) seed so geometry and render agree. */
+function seedFor(startAt: number, country: string): number {
+  let h = 0;
+  for (let i = 0; i < country.length; i++) {
+    h = ((h * 31) + country.charCodeAt(i)) | 0;
+  }
+  return startAt + h;
+}
+
+/** Forward-positive delta in [0, 2π). */
+function forwardDelta(from: number, to: number): number {
+  const TWO = Math.PI * 2;
+  return ((to - from) % TWO + TWO) % TWO;
+}
+
+// Internal state — what the draw loop needs to execute the ritual. Held
+// in a ref so a new Ritual prop can publish a fresh plan without
+// restarting the animation loop.
+type ActiveRitual = {
+  startAt: number;
+  sweepMs: number;
+  holdMs: number;
+  fadeMs: number;
+  /** Rotation at startAt (continuous with idle rotation before). */
+  rotStart: number;
+  /** Rotation when sweep ends — primary's rotIdeal, one full turn + delta. */
+  rotEnd: number;
+  totalAngle: number;
+  primaryCountry: string | null;
+  litAt: Map<string, number>;
+  /** Jittered (lat, lon) per country, precomputed so the target-snap and
+   *  the rendered point line up exactly. */
+  jPos: Map<string, [number, number]>;
+};
+
 // ------ component ------
 
-export default function Earth({ size = 320, highlights = [] }: Props) {
+export default function Earth({ size = 320, ritual = null }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const highlightsRef = useRef<EarthHighlight[]>(highlights);
 
-  // Rotation is `baseRot(t) + rotOffset`. When a new *primary* highlight
-  // arrives we compute the offset that brings the user's country to the
-  // front center, and ease toward it so the pulse is never hidden on the
-  // back of the globe. Handled via refs so it doesn't trigger re-renders
-  // every frame.
+  // Rotation is `baseRot(t) + rotOffset`. The ritual temporarily takes
+  // over the rotation; on exit we write back to rotOffset so the idle
+  // loop picks up exactly where the ritual stopped — no visible jump.
   const rotOffsetRef = useRef(0);
-  const rotOffsetTargetRef = useRef(0);
-  const pendingSnapRef = useRef<string | null>(null);
-  const lastPrimaryKeyRef = useRef<string | null>(null);
+  const activeRef = useRef<ActiveRitual | null>(null);
 
+  // When a new ritual arrives, compute its full plan (rotStart, rotEnd,
+  // per-country light-up times, jittered positions) and publish to the
+  // ref. We sample real + perf clocks once and back-project the base
+  // rotation to ritual.startAt so rotStart is continuous with the idle
+  // rotation the user has been watching.
   useEffect(() => {
-    highlightsRef.current = highlights;
-    // Find the current primary. If it's new, queue a snap toward it.
-    const primary = highlights.find((h) => h.primary);
-    if (primary) {
-      const key = `${primary.country}@${primary.startedAt}`;
-      if (key !== lastPrimaryKeyRef.current) {
-        lastPrimaryKeyRef.current = key;
-        pendingSnapRef.current = primary.country;
-      }
-    } else {
-      lastPrimaryKeyRef.current = null;
+    if (!ritual) return;
+
+    const dateSample = Date.now();
+    const perfSample = performance.now();
+    const perfAtStart = perfSample - (dateSample - ritual.startAt);
+    const rotStart =
+      (perfAtStart / ROTATION_PERIOD_MS) * Math.PI * 2 + rotOffsetRef.current;
+
+    const jPos = new Map<string, [number, number]>();
+    const litAt = new Map<string, number>();
+
+    const primary = ritual.primaryCountry;
+    let totalAngle = Math.PI * 2; // at minimum, one clean rotation
+    let rotEnd = rotStart + totalAngle;
+
+    if (primary && COUNTRY_COORDS[primary]) {
+      const pj = findLandJitter(
+        seedFor(ritual.startAt, primary),
+        COUNTRY_COORDS[primary],
+        2,
+        3,
+      );
+      jPos.set(primary, pj);
+      const w = latLonToVec(pj[0], pj[1]);
+      const rotIdeal = Math.atan2(-w[0], w[2]);
+      // 2π baseline + forward slice so the earth performs between 1.0
+      // and 2.0 full turns, averaging 1.5. The "+2π" is what makes the
+      // sweep feel ceremonial instead of a single snap.
+      const fwd = forwardDelta(rotStart, rotIdeal);
+      rotEnd = rotStart + Math.PI * 2 + fwd;
+      totalAngle = rotEnd - rotStart;
+      litAt.set(primary, ritual.startAt + ritual.sweepMs);
     }
-  }, [highlights]);
+
+    // Non-primary countries light the first time the sweep passes them.
+    // Convert angular progress → time via the inverse of ease-out-cubic,
+    // so lights appear in lock-step with the visible rotation, not on
+    // some unrelated linear schedule.
+    for (const c of ritual.countries) {
+      if (c === primary) continue;
+      if (!COUNTRY_COORDS[c]) continue;
+      const pj = findLandJitter(
+        seedFor(ritual.startAt, c),
+        COUNTRY_COORDS[c],
+        6,
+        10,
+      );
+      jPos.set(c, pj);
+      const w = latLonToVec(pj[0], pj[1]);
+      const rotIdeal = Math.atan2(-w[0], w[2]);
+      const fwd = forwardDelta(rotStart, rotIdeal);
+      // totalAngle ≥ 2π ≥ fwd, so every country is covered.
+      const x = Math.min(1, fwd / totalAngle);
+      // inverse of eased = 1 - (1-p)^3 → p = 1 - (1-eased)^(1/3)
+      const tFrac = 1 - Math.pow(1 - x, 1 / 3);
+      litAt.set(c, ritual.startAt + ritual.sweepMs * tFrac);
+    }
+
+    activeRef.current = {
+      startAt: ritual.startAt,
+      sweepMs: ritual.sweepMs,
+      holdMs: ritual.holdMs,
+      fadeMs: ritual.fadeMs,
+      rotStart,
+      rotEnd,
+      totalAngle,
+      primaryCountry: primary,
+      litAt,
+      jPos,
+    };
+  }, [ritual]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -427,41 +562,43 @@ export default function Earth({ size = 320, highlights = [] }: Props) {
 
       ctx.clearRect(0, 0, BUF, BUF);
 
-      // If a new primary highlight is pending, compute the rotation that
-      // brings its country to the front center. z1 = -w[0]*sinR + w[2]*cosR;
-      // that's maximized when rot = atan2(-w[0], w[2]), so we solve for the
-      // offset needed on top of the base rotation at this instant. We use
-      // the JITTERED coord, not the bare centroid, so the camera lines up
-      // exactly with the point that's about to light.
-      if (pendingSnapRef.current) {
-        const code = pendingSnapRef.current;
-        const coords = COUNTRY_COORDS[code];
-        const primary = highlightsRef.current.find(
-          (h) => h.primary && h.country === code,
-        );
-        if (coords && primary) {
-          const j = jitterFor(primary.startedAt, 2, 3);
-          const w = latLonToVec(coords[0] + j[0], coords[1] + j[1]);
-          const rotIdeal = Math.atan2(-w[0], w[2]);
-          const baseNow = (t / ROTATION_PERIOD_MS) * Math.PI * 2;
-          // Normalize target to "shortest path" relative to the current
-          // offset so we never ease the long way around.
-          let target = rotIdeal - baseNow;
-          const diff = target - rotOffsetRef.current;
-          target = rotOffsetRef.current + Math.atan2(Math.sin(diff), Math.cos(diff));
-          rotOffsetTargetRef.current = target;
+      // ---- Resolve rotation for this frame ----
+      // Three regimes: idle (baseRot + rotOffset), sweeping (override
+      // with eased interpolation from rotStart → rotEnd), and hold+fade
+      // (frozen at rotEnd). On exit we commit the final rotation into
+      // rotOffset so the next idle frame rolls forward from the same
+      // place the ritual stopped.
+      const realNow = Date.now();
+      const active = activeRef.current;
+      let rot: number;
+
+      if (active) {
+        const sweepEnd = active.startAt + active.sweepMs;
+        const holdEnd = sweepEnd + active.holdMs;
+        const fadeEnd = holdEnd + active.fadeMs;
+
+        if (realNow <= active.startAt) {
+          rot =
+            (t / ROTATION_PERIOD_MS) * Math.PI * 2 + rotOffsetRef.current;
+        } else if (realNow <= sweepEnd) {
+          const p = (realNow - active.startAt) / active.sweepMs;
+          const eased = 1 - Math.pow(1 - p, 3);
+          rot = active.rotStart + active.totalAngle * eased;
+        } else if (realNow <= fadeEnd) {
+          rot = active.rotEnd;
+        } else {
+          // Seamless handoff: set rotOffset so baseRot(t) + rotOffset = rotEnd.
+          const baseAt = (t / ROTATION_PERIOD_MS) * Math.PI * 2;
+          let off = active.rotEnd - baseAt;
+          off = Math.atan2(Math.sin(off), Math.cos(off));
+          rotOffsetRef.current = off;
+          activeRef.current = null;
+          rot = baseAt + off;
         }
-        pendingSnapRef.current = null;
+      } else {
+        rot = (t / ROTATION_PERIOD_MS) * Math.PI * 2 + rotOffsetRef.current;
       }
 
-      // Ease current offset toward target. 0.05 per 28fps frame → ~1.4s to
-      // settle the biggest swing (±π). Fast enough that the pulse rises on
-      // a visible country; slow enough that the swing reads as a deliberate
-      // "camera move" rather than a jump cut.
-      const oDiff = rotOffsetTargetRef.current - rotOffsetRef.current;
-      rotOffsetRef.current += oDiff * 0.05;
-
-      const rot = (t / ROTATION_PERIOD_MS) * Math.PI * 2 + rotOffsetRef.current;
       const cosR = Math.cos(rot);
       const sinR = Math.sin(rot);
 
@@ -562,80 +699,82 @@ export default function Earth({ size = 320, highlights = [] }: Props) {
         }
       }
 
-      // ------ highlights (individual tap points) ------
-      // Each highlight is rendered as a *single point* with a soft halo —
-      // not as a country-sized glow. Per-tap jitter on top of the country
-      // centroid means repeat taps from the same country appear as
-      // separate, scattered dots instead of stacking on one spot.
-      const now = Date.now();
-      for (const hl of highlightsRef.current) {
-        const baseCoords = COUNTRY_COORDS[hl.country];
-        if (!baseCoords) continue;
+      // ------ ritual highlights ------
+      // Points light one-by-one during the sweep, bloom to full
+      // intensity, then all fade together through the hold/fade tail.
+      if (active) {
+        const sweepEnd = active.startAt + active.sweepMs;
+        const fadeStart = sweepEnd + active.holdMs;
+        const fadeEnd = fadeStart + active.fadeMs;
 
-        const age = now - hl.startedAt;
-        if (age < 0) continue; // scheduled in the future
+        // Shared fade envelope — all points dim in unison after the
+        // hold, so the picture resolves into a single held breath
+        // instead of each point going out on its own schedule.
+        let shared: number;
+        if (realNow < fadeStart) shared = 1;
+        else if (realNow < fadeEnd)
+          shared = 1 - (realNow - fadeStart) / active.fadeMs;
+        else shared = 0;
 
-        const duration = hl.primary ? 6000 : 3400;
-        if (age > duration) continue;
+        if (shared > 0) {
+          for (const [country, pos] of active.jPos) {
+            const lit = active.litAt.get(country);
+            if (lit === undefined || realNow < lit) continue;
+            const isPrimary = country === active.primaryCountry;
 
-        // Jitter: tight for the user's own point (so the camera snap
-        // stays accurate), wider for resonance so other taps scatter.
-        const j = hl.primary
-          ? jitterFor(hl.startedAt, 2, 3)
-          : jitterFor(hl.startedAt, 6, 10);
-        const lat = baseCoords[0] + j[0];
-        const lon = baseCoords[1] + j[1];
+            const w = latLonToVec(pos[0], pos[1]);
+            const x1 = w[0] * cosR + w[2] * sinR;
+            const y1 = w[1];
+            const z1 = -w[0] * sinR + w[2] * cosR;
+            const rx = x1 * COS_T - y1 * SIN_T;
+            const ry = x1 * SIN_T + y1 * COS_T;
+            const rz = z1;
+            if (rz < 0) continue; // on the back of the globe right now
 
-        const w = latLonToVec(lat, lon);
-        const x1 = w[0] * cosR + w[2] * sinR;
-        const y1 = w[1];
-        const z1 = -w[0] * sinR + w[2] * cosR;
-        const rx = x1 * COS_T - y1 * SIN_T;
-        const ry = x1 * SIN_T + y1 * COS_T;
-        const rz = z1;
-        if (rz < 0) continue; // on the back of the globe right now
+            const sx = cx + R * rx;
+            const sy = cy - R * ry;
 
-        const sx = cx + R * rx;
-        const sy = cy - R * ry;
+            // Per-point rise envelope: quick ignition, then full hold
+            // until the shared fade takes over.
+            const age = realNow - lit;
+            const riseMs = isPrimary ? 600 : 380;
+            let intensity = age < riseMs ? age / riseMs : 1;
+            intensity *= shared;
 
-        // Envelope.
-        const p = age / duration;
-        let intensity: number;
-        if (hl.primary) {
-          // Sharper rise, long hold, slow fade.
-          if (p < 0.08) intensity = p / 0.08;
-          else if (p < 0.55) intensity = 1;
-          else intensity = 1 - (p - 0.55) / 0.45;
-        } else {
-          // Gentle bell.
-          intensity = Math.sin(Math.PI * p);
+            const limb = Math.max(0, rz);
+            intensity *= 0.4 + 0.6 * limb;
+            if (intensity < 0.012) continue;
+
+            // Primary is noticeably stronger — the user's point should
+            // be the gravitational center of the reveal, not just one
+            // among the chorus.
+            const glowR = (isPrimary ? 14 : 7) * dpr;
+            const coreR = (isPrimary ? 3.2 : 1.5) * dpr;
+            const color = isPrimary
+              ? "255, 232, 205"
+              : "210, 225, 238";
+
+            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+            grad.addColorStop(
+              0,
+              `rgba(${color}, ${(0.98 * intensity).toFixed(3)})`,
+            );
+            grad.addColorStop(
+              0.35,
+              `rgba(${color}, ${(0.42 * intensity).toFixed(3)})`,
+            );
+            grad.addColorStop(1, `rgba(${color}, 0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = `rgba(${color}, ${intensity.toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
-        intensity = Math.max(0, Math.min(1, intensity));
-        const limb = Math.max(0, rz);
-        intensity *= 0.35 + 0.65 * limb;
-        if (intensity < 0.02) continue;
-
-        // Point-sized glow. Roughly: a 2px bright core + a 6-10px halo.
-        // Tight enough that a viewer reads "a lit dot" instead of "the
-        // country is on fire."
-        const glowR = (hl.primary ? 10 : 6) * dpr;
-        const coreR = (hl.primary ? 2.2 : 1.4) * dpr;
-        // Warm ivory for the user's own tap; cool porcelain for resonance.
-        const color = hl.primary ? "255, 232, 205" : "205, 220, 235";
-
-        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
-        grad.addColorStop(0, `rgba(${color}, ${(0.95 * intensity).toFixed(3)})`);
-        grad.addColorStop(0.35, `rgba(${color}, ${(0.4 * intensity).toFixed(3)})`);
-        grad.addColorStop(1, `rgba(${color}, 0)`);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = `rgba(${color}, ${intensity.toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
-        ctx.fill();
       }
 
       rafId = requestAnimationFrame(draw);
