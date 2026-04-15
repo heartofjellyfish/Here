@@ -481,6 +481,9 @@ body {
   align-items: center;
   gap: 14px;
   max-width: 32ch;
+  /* Pull the ack a little closer to the earth — empty vertical space
+     beneath it otherwise feels like a missing subtitle. */
+  margin-top: -3vh;
 }
 
 .reveal__ack,
