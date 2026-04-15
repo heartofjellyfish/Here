@@ -444,20 +444,16 @@ export default function SunFlare() {
         }
         // Alpha capped deliberately low so the page stays readable.
         const rayAlpha = rayEnv * 0.35;
-        // Orient the rays directionally instead of as a symmetric
-        // pinwheel: CSS mask carves a "visible cone" on the +x side
-        // of the element, so by rotating the element so its local +x
-        // points FROM the sun TOWARD the origin (into the scene),
-        // the rays read as sunlight shafting *forward* through air,
-        // not a hub of spokes around the sun.
-        // Small sinusoidal wobble on top for a whisper of liveness
-        // without re-introducing the pinwheel rotation.
-        const sunDistForRays = Math.hypot(rawSx, rawSy);
-        const forwardDeg =
-          sunDistForRays > 0.01
-            ? (Math.atan2(rawSy, rawSx) * 180) / Math.PI + 180
-            : 0;
-        const rayRot = forwardDeg + 4 * Math.sin(now * 0.0008);
+        // Rays fan omnidirectionally from the sun — the forward-cone
+        // mask was dropped because it read as "a wedge of parallel
+        // streaks in the upper half," not "rays radiating from a
+        // point." With the cone gone, the element just sits at the
+        // sun and the radial mask handles the brightness falloff.
+        // A very slow continuous rotation keeps the turbulence-
+        // displaced strands from looking frozen; the amplitude is
+        // ~360°/minute — slow enough that the eye doesn't read it
+        // as motion, only as liveness.
+        const rayRot = (now * 0.006) % 360;
         godRaysRef.current.style.transform =
           `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
           `translate(-50%, -50%) ` +

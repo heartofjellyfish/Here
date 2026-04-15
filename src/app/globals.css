@@ -594,64 +594,38 @@ body {
       transparent 2deg,
       transparent 23deg
     );
-  /* Two-layer mask composited with `intersect`:
-       1. radial-gradient centered AT the sun — brightest at the
-          source, fading outward. This makes each shaft read as
-          "emitted from the sun" with proper tapering along its
-          length, rather than a uniform-intensity spoke.
-       2. conic-gradient carving a 120° forward cone — only the
-          rays whose angle lies in the cone around the element's
-          local +x axis survive. JS rotates the element so local
-          +x points FROM the sun INTO the scene, giving us a
-          cone of shafts fanning forward like real volumetric
-          light shafts, not a 360° pinwheel around the source.
-     Result: intersect = (near-sun) AND (forward) — exactly the
-     set of rays that would be visible if the sun were lighting
-     dust in front of us. */
-  -webkit-mask-image:
-    radial-gradient(
-      closest-side at 50% 50%,
-      black 0%,
-      black 18%,
-      rgba(0, 0, 0, 0.78) 38%,
-      rgba(0, 0, 0, 0.38) 62%,
-      rgba(0, 0, 0, 0.12) 82%,
-      transparent 98%
-    ),
-    conic-gradient(
-      from 0deg at 50% 50%,
-      transparent 0deg,
-      transparent 26deg,
-      rgba(0, 0, 0, 0.35) 48deg,
-      black 78deg,
-      black 102deg,
-      rgba(0, 0, 0, 0.35) 132deg,
-      transparent 154deg,
-      transparent 360deg
-    );
-  -webkit-mask-composite: source-in;
-  mask-image:
-    radial-gradient(
-      closest-side at 50% 50%,
-      black 0%,
-      black 18%,
-      rgba(0, 0, 0, 0.78) 38%,
-      rgba(0, 0, 0, 0.38) 62%,
-      rgba(0, 0, 0, 0.12) 82%,
-      transparent 98%
-    ),
-    conic-gradient(
-      from 0deg at 50% 50%,
-      transparent 0deg,
-      transparent 26deg,
-      rgba(0, 0, 0, 0.35) 48deg,
-      black 78deg,
-      black 102deg,
-      rgba(0, 0, 0, 0.35) 132deg,
-      transparent 154deg,
-      transparent 360deg
-    );
-  mask-composite: intersect;
+  /* Single radial mask centered at the sun — brightest at the
+     source, fading outward. This makes every shaft clearly read
+     as "emitted from the sun" with distance-based tapering.
+     Previously there was a second conic-gradient mask carving a
+     120° forward cone; that was dropped because the wide cone
+     visually read as "a wedge of parallel streaks in the upper
+     half of the frame" rather than "rays radiating from a point."
+     Without the cone, rays fan in all directions from the sun
+     position — which is what real volumetric scatter does — and
+     the clear radial convergence at the sun sells the "from the
+     sun" reading that the cone version lacked.
+     The mask is much more aggressive at the center (black for
+     the first 28% of radius, only 0.6 at 40%) so the bright
+     origin zone is obviously the sun, not a vague bright patch. */
+  -webkit-mask-image: radial-gradient(
+    closest-side at 50% 50%,
+    black 0%,
+    black 28%,
+    rgba(0, 0, 0, 0.6) 44%,
+    rgba(0, 0, 0, 0.22) 68%,
+    rgba(0, 0, 0, 0.06) 86%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side at 50% 50%,
+    black 0%,
+    black 28%,
+    rgba(0, 0, 0, 0.6) 44%,
+    rgba(0, 0, 0, 0.22) 68%,
+    rgba(0, 0, 0, 0.06) 86%,
+    transparent 100%
+  );
   /* Turbulence first, then blur. The SVG turbulence filter
      (defined inline in SunFlare.tsx) breaks the clean conic
      spokes into variable-length fuzzy strands — "毛毛躁躁"
