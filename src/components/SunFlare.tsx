@@ -128,21 +128,22 @@ const GHOSTS: GhostDef[] = [
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
   // Large soft disc — the anchor of the chain, warmest mid-amber.
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
-  // HEXAGONAL ghost — the one that actually reveals the lens's
-  // aperture shape. For the polygon silhouette to *read* as a
-  // hexagon it has to be bigger, sharper, and more opaque at
-  // the edges than a normal disc — otherwise the clip-path cuts
-  // at a region that's already faded to transparent and the
-  // hex reads as a circle. Low blur (0.5px) so the six straight
-  // edges survive; gradient holds color all the way to the rim.
-  // Subtly cool-tinted so it also carries the chromatic-
-  // separation role.
-  { t: -0.68, size: 10, hue: "205, 220, 235", kind: "hex", blur: 0.5, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.6, sizePhase: 4.1 },
+  // Subtly cool disc sitting where the hex used to be. The
+  // chromatic-separation job it was doing still needs doing —
+  // one cool patch breaks up the otherwise all-amber chain —
+  // but it doesn't need to be the hexagon.
+  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
   // Amber ghost further along the chain.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
-  // Deepening amber approaching the tail. Warm-only from here so
-  // the chain resolves back to the scene's overall color mood.
-  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
+  // HEXAGONAL ghost — moved out to a more distant chain
+  // position so (a) it never overlaps the earth, even at
+  // zenith when the chain axis is vertical, and (b) it reads
+  // as an outlier polygon in the tail of the chain rather
+  // than a giant tile pressing against the main subject.
+  // Smaller than before (7vw), low defocusResponse so it
+  // doesn't balloon at zenith, low blur so the six edges
+  // survive.
+  { t: -1.15, size: 7, hue: "220, 195, 160", kind: "hex", blur: 0.6, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.3, sizePhase: 5.6 },
   // Small warm tail — sharper again at the far end of the chain.
   { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
