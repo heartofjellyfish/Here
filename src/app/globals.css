@@ -594,26 +594,64 @@ body {
       transparent 2deg,
       transparent 23deg
     );
-  /* Directional mask: the bright zone is offset to +x (90% 50%), so
-     only rays on the "forward" side of the element are visible.
-     JS rotates the element so its local +x points FROM the sun INTO
-     the scene (toward the viewport origin), turning the rays from a
-     360° pinwheel into a cone of shafts fanning forward — which is
-     how god rays actually read when the light source is in frame. */
-  -webkit-mask: radial-gradient(
-    ellipse 65% 50% at 90% 50%,
-    black 10%,
-    black 45%,
-    rgba(0, 0, 0, 0.35) 70%,
-    transparent 92%
-  );
-  mask: radial-gradient(
-    ellipse 65% 50% at 90% 50%,
-    black 10%,
-    black 45%,
-    rgba(0, 0, 0, 0.35) 70%,
-    transparent 92%
-  );
+  /* Two-layer mask composited with `intersect`:
+       1. radial-gradient centered AT the sun — brightest at the
+          source, fading outward. This makes each shaft read as
+          "emitted from the sun" with proper tapering along its
+          length, rather than a uniform-intensity spoke.
+       2. conic-gradient carving a 120° forward cone — only the
+          rays whose angle lies in the cone around the element's
+          local +x axis survive. JS rotates the element so local
+          +x points FROM the sun INTO the scene, giving us a
+          cone of shafts fanning forward like real volumetric
+          light shafts, not a 360° pinwheel around the source.
+     Result: intersect = (near-sun) AND (forward) — exactly the
+     set of rays that would be visible if the sun were lighting
+     dust in front of us. */
+  -webkit-mask-image:
+    radial-gradient(
+      closest-side at 50% 50%,
+      black 0%,
+      black 18%,
+      rgba(0, 0, 0, 0.78) 38%,
+      rgba(0, 0, 0, 0.38) 62%,
+      rgba(0, 0, 0, 0.12) 82%,
+      transparent 98%
+    ),
+    conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg,
+      transparent 26deg,
+      rgba(0, 0, 0, 0.35) 48deg,
+      black 78deg,
+      black 102deg,
+      rgba(0, 0, 0, 0.35) 132deg,
+      transparent 154deg,
+      transparent 360deg
+    );
+  -webkit-mask-composite: source-in;
+  mask-image:
+    radial-gradient(
+      closest-side at 50% 50%,
+      black 0%,
+      black 18%,
+      rgba(0, 0, 0, 0.78) 38%,
+      rgba(0, 0, 0, 0.38) 62%,
+      rgba(0, 0, 0, 0.12) 82%,
+      transparent 98%
+    ),
+    conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg,
+      transparent 26deg,
+      rgba(0, 0, 0, 0.35) 48deg,
+      black 78deg,
+      black 102deg,
+      rgba(0, 0, 0, 0.35) 132deg,
+      transparent 154deg,
+      transparent 360deg
+    );
+  mask-composite: intersect;
   filter: blur(1.8px);
 }
 

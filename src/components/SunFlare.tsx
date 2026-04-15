@@ -329,20 +329,34 @@ export default function SunFlare() {
         const gx = camX * (1 - g.t) + g.t * rawSx + g.perpOffset * perpUnitX;
         const gy = camY * (1 - g.t) + g.t * rawSy + g.perpOffset * perpUnitY;
 
-        // Size driven by two independent sources so the chain
-        // doesn't inflate in lockstep:
-        //   1. defocus × per-ghost response × global defocus gain.
+        // Size driven by three sources so the chain doesn't inflate
+        // in lockstep:
+        //   1. rise-growth: during the rise portion, visible size
+        //      tracks envelope — at the very start of the window
+        //      ghosts are half their base size, growing to full by
+        //      peak. Without this, the moment the envelope first
+        //      crosses zero the anchor already appears at its
+        //      multi-tens-of-vw scale (defocus is high on rise
+        //      too, because sun distance drops fast), reading as
+        //      "a huge faint ring floating in the sky" instead of
+        //      a flare artifact coalescing with the light. Post-
+        //      peak the factor stays at 1 so the slow fade is
+        //      driven by alpha alone, not size collapse.
+        //   2. defocus × per-ghost response × global defocus gain.
         //      Global gain 2.5 makes near-axis bloom dramatic (the
         //      "奇观" moment when the lens stares into the source).
         //      Per-ghost response picks who swells most: anchor and
         //      ring pump hard, glint stays crisp.
-        //   2. per-ghost size wobble on its own sine phase — gives
+        //   3. per-ghost size wobble on its own sine phase — gives
         //      each reflection its own breath independent of the
         //      sun's position. Small amplitude so it reads as
         //      shimmer, not jitter.
+        const riseGrowth =
+          cyclePct < FLARE_WINDOW_PEAK ? 0.5 + envelope * 0.5 : 1;
         const sizeWobble =
           1 + 0.07 * Math.sin(g.sizePhase + cyclePct * 0.11);
-        const scale = (1 + defocus * g.defocusResponse * 2.5) * sizeWobble;
+        const scale =
+          riseGrowth * (1 + defocus * g.defocusResponse * 2.5) * sizeWobble;
 
         // Alpha wobble: per-ghost sine so each one breathes at
         // its own phase. Range 0.8–1.0, so ghosts never go to
