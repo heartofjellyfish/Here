@@ -560,8 +560,16 @@ body {
    each ray reads as a shaft of dust-scattered light, not a line. */
 .sun-flare__rays {
   position: absolute;
-  top: 0;
-  left: 0;
+  /* Anchored at viewport center like the ghosts and the starburst,
+     so JS can offset by the sun's (vw, vh) position relative to
+     viewport center. Previously top:0/left:0 put the element in the
+     upper-left corner, and after `translate(sunX, sunY) translate(-50%,-50%)`
+     the element's center ended up at viewport coord (0, 0) — the
+     upper-left corner — not at the sun. This is why the rays
+     looked like they were radiating from off-screen upper-left
+     instead of from the sun. */
+  top: 50%;
+  left: 50%;
   width: 200vmax;
   height: 200vmax;
   pointer-events: none;
@@ -652,8 +660,13 @@ body {
    a laser. */
 .sun-flare__axis {
   position: absolute;
-  top: 0;
-  left: 0;
+  /* Viewport-centered anchor (same fix as .sun-flare__rays). With
+     top:0/left:0 the streak's anchor ended up at viewport (0,0),
+     so the line appeared to emanate from the upper-left corner of
+     the frame — the "white stick on the left" that had no business
+     being there. */
+  top: 50%;
+  left: 50%;
   width: 180vw;
   height: 2.5vh;
   transform-origin: 0% 50%;
