@@ -492,11 +492,15 @@ body {
 }
 
 /* Anamorphic streak — a wide horizontal smear through the optical
-   center, the signature "J.J. Abrams" artifact of a sun hitting an
-   anamorphic lens element. Kept very thin vertically and wide
-   horizontally, soft warm gradient fading to transparent at the
-   edges. Opacity and horizontal scale are driven from JS each
-   frame (see SunFlare.tsx). */
+   center, the signature artifact of bright light hitting an
+   anamorphic lens element. Tinted COOL BLUE, not warm: that's the
+   Nolan / Interstellar look, and the blue-coated anamorphic front
+   element is the real-world reason. The blue streak also reads
+   with much more contrast against our warm ambient haze than a
+   warm streak ever could — it's the color the eye actually sees
+   because the rest of the flare is already warm. Opacity and
+   horizontal scale are driven from JS each frame (see
+   SunFlare.tsx). */
 .sun-flare__streak {
   position: absolute;
   top: 50%;
@@ -506,10 +510,10 @@ body {
   border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
-    rgba(255, 236, 190, 0.9) 0%,
-    rgba(255, 214, 150, 0.55) 18%,
-    rgba(255, 190, 120, 0.22) 40%,
-    rgba(255, 170, 100, 0.06) 68%,
+    rgba(200, 225, 255, 0.9) 0%,
+    rgba(160, 205, 255, 0.55) 18%,
+    rgba(130, 185, 245, 0.22) 40%,
+    rgba(110, 170, 230, 0.06) 68%,
     transparent 92%
   );
   filter: blur(3px);

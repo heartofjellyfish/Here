@@ -100,31 +100,46 @@ type GhostDef = {
   sizePhase: number;
 };
 
+// Chromatic palette reference (Interstellar / anamorphic flares):
+// real lens coatings reflect specific wavelength bands, so the ghost
+// chain is NEVER monochrome-amber — it's warm hotspots interspersed
+// with cool cyan/blue and deep red artifacts. That chromatic
+// separation is what makes a flare read as "cinematic" instead of
+// "colored decal." The mix below keeps warm tones near the sun-end
+// (they dominate) but drops a cool cyan ghost into the middle and a
+// cold deep-red at the tail — contrast against our warm ambient
+// haze, not harmony with it.
 const GHOSTS: GhostDef[] = [
   // Bright glint between sun and center — the sharp hot pinpoint
   // every real lens flare has closest to the source. Stays small
   // and crisp: a real highlight doesn't bloom.
   { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0.0, defocusResponse: 0.25, sizePhase: 0.2 },
-  // Small pale disc just past the optical center.
+  // Small pale disc just past the optical center. Slight warm
+  // tint, still near-white — reflections off the first optical
+  // surface barely shift wavelength.
   { t: -0.1, size: 4, hue: "255, 248, 220", kind: "disc", blur: 1.2, alphaPhase: 0.8, perpOffset: 0.3, defocusResponse: 0.55, sizePhase: 1.1 },
-  // The *one* aperture-iris ring — this is the signature
-  // donut-shaped artifact that reads as "real lens flare" at a
-  // glance. Highest defocusResponse: a real iris ring *visibly*
-  // pulses between tight and wide as the sun's off-axis angle
-  // changes — that's what "光圈大小应该变" means.
+  // The *one* aperture-iris ring. Warm amber — the classic coated
+  // iris artifact. Highest defocusResponse: a real iris ring
+  // visibly pulses between tight and wide as the sun's off-axis
+  // angle changes.
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
   // Large soft disc — the anchor of the chain, warmest mid-amber.
-  // Low defocusResponse: it's already 13vw, any further bloom
-  // just eats the screen and turns the whole chain into one blob.
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
-  // Disc overlapping the anchor — dense warm cluster.
-  { t: -0.68, size: 6, hue: "255, 202, 140", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
-  // Deeper amber ghost, further along the chain.
+  // COOL CYAN GHOST — the Interstellar move. Internal reflection
+  // off an element with a blue-shifted coating. Drops a patch of
+  // contrasting color into the middle of the chain so it reads as
+  // dichroic optics, not a single tinted decal.
+  { t: -0.68, size: 6, hue: "150, 205, 240", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
+  // Amber ghost, further along the chain.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
-  // Warm ghost approaching the tail.
-  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
-  // Smallest and most orange — tail of the chain, sharper again.
-  { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
+  // Purple/magenta ghost — second chromatic break. Sits between
+  // the cool cyan and the deep red tail so the chain rolls across
+  // the spectrum rather than snapping between two colors.
+  { t: -1.15, size: 7, hue: "220, 150, 200", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
+  // Deep red tail — a real flare's far end is often the most
+  // saturated because the long-path reflections accumulate
+  // chromatic shift. Small and sharp again, not diffuse.
+  { t: -1.5, size: 4.5, hue: "255, 120, 90", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
 
 // Linearly interpolate sun position from the waypoint table.
