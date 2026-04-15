@@ -59,7 +59,7 @@ const SUN_CYCLE_MS = 153_000;
 // the way once the sun is past its high point. A symmetric
 // envelope kept the flare lingering well into the sun's descent,
 // which felt like it overstayed.
-const FLARE_WINDOW_START = 8;
+const FLARE_WINDOW_START = 9;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
 // 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 53 → 7% past peak
 // → ~10.7s of fade past zenith (effectively "11s past peak"). Tuned
