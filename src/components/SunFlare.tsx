@@ -78,6 +78,16 @@ const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
 // losing energy gradually rather than snapping off.
 const FLARE_WINDOW_END = 65.6;
 
+// Volumetric "god rays" / crepuscular shafts — separate from the
+// lens flare (which is reflections inside the lens). These are
+// light scattering through air/dust in the scene itself and are
+// kept on a tight window around peak only, with a low cap alpha,
+// so they don't drown the earth and the phrase. If it looks gaudy
+// at peak, narrowing this window or lowering the alpha in CSS is
+// the first knob to turn.
+const GODRAYS_WINDOW_START = 38;  // ~12s before peak
+const GODRAYS_WINDOW_END = 54;    // ~12s after peak
+
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
   // Axial position along the line from the sun through the lens's
@@ -183,6 +193,7 @@ function sunPosAt(cyclePct: number): [number, number] {
 export default function SunFlare() {
   const ghostRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starburstRef = useRef<HTMLDivElement | null>(null);
+  const godRaysRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -375,6 +386,40 @@ export default function SunFlare() {
         starburstRef.current.style.opacity = Math.max(0, Math.min(1, burstAlpha)).toFixed(3);
       }
 
+      // God rays — volumetric light shafts in the scene (not inside
+      // the lens). Own narrow window centered on peak so they don't
+      // overstay. Ease-in on the rise, ease-out on the fall so they
+      // crescendo into the peak moment. Hard-capped at 0.35 alpha:
+      // full-frame ray field would drown the earth and the phrase;
+      // this is meant to be a whisper, not a floodlight.
+      if (godRaysRef.current) {
+        let rayEnv = 0;
+        if (cyclePct >= GODRAYS_WINDOW_START && cyclePct <= GODRAYS_WINDOW_END) {
+          if (cyclePct < FLARE_WINDOW_PEAK) {
+            const u =
+              (cyclePct - GODRAYS_WINDOW_START) /
+              (FLARE_WINDOW_PEAK - GODRAYS_WINDOW_START);
+            rayEnv = Math.pow(u, 1.8);
+          } else {
+            const u =
+              (cyclePct - FLARE_WINDOW_PEAK) /
+              (GODRAYS_WINDOW_END - FLARE_WINDOW_PEAK);
+            rayEnv = Math.pow(1 - u, 1.8);
+          }
+        }
+        // Alpha capped deliberately low so the page stays readable.
+        const rayAlpha = rayEnv * 0.35;
+        // Very slow rotation — one full rev every ~6 minutes.
+        // Rays need to feel alive without drawing the eye.
+        const rayRot = (now * 0.0015) % 360;
+        // Centered on the sun's screen position (raw, not drifted).
+        godRaysRef.current.style.transform =
+          `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
+          `translate(-50%, -50%) ` +
+          `rotate(${rayRot.toFixed(2)}deg)`;
+        godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
+      }
+
       raf = requestAnimationFrame(tick);
     };
 
@@ -384,6 +429,7 @@ export default function SunFlare() {
 
   return (
     <div className="sun-flare" aria-hidden="true">
+      <div ref={godRaysRef} className="sun-flare__rays" />
       <div ref={starburstRef} className="sun-flare__starburst" />
       {GHOSTS.map((g, i) => (
         <div

@@ -546,6 +546,77 @@ body {
    Built from two crossed horizontal/vertical gradient bars; JS
    adds a slow rotation each frame so the spikes don't read as
    static decal. Blend-mode inherited from .sun-flare. */
+/* God rays — volumetric crepuscular shafts radiating from the sun.
+   NOT a lens artifact: this is light scattering through particles
+   in the scene. Built from three layered repeating-conic-gradients
+   at different angular periods (7°, 11°, 23°) — their interference
+   produces non-uniform ray spacing, so the rays don't read as a
+   machine-regular pinwheel. A radial mask hollows the center (rays
+   start some distance out from the sun, not from its surface) and
+   fades the outer edge so they dissolve into the backdrop rather
+   than ending at a hard circle.
+   Kept deliberately restrained: low per-ray alpha, narrow time
+   window (see GODRAYS_WINDOW_* in SunFlare.tsx), soft blur so
+   each ray reads as a shaft of dust-scattered light, not a line. */
+.sun-flare__rays {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200vmax;
+  height: 200vmax;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  background-image:
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 240, 210, 0.1) 0.6deg,
+      rgba(255, 240, 210, 0.14) 0.9deg,
+      rgba(255, 240, 210, 0.1) 1.2deg,
+      transparent 1.8deg,
+      transparent 7deg
+    ),
+    repeating-conic-gradient(
+      from 3.7deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 235, 195, 0.07) 0.5deg,
+      rgba(255, 235, 195, 0.09) 0.8deg,
+      transparent 1.3deg,
+      transparent 11deg
+    ),
+    repeating-conic-gradient(
+      from 8.2deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 245, 215, 0.11) 0.8deg,
+      rgba(255, 245, 215, 0.15) 1.1deg,
+      rgba(255, 245, 215, 0.11) 1.4deg,
+      transparent 2deg,
+      transparent 23deg
+    );
+  -webkit-mask: radial-gradient(
+    closest-side,
+    transparent 0%,
+    transparent 6%,
+    rgba(0, 0, 0, 0.4) 12%,
+    black 22%,
+    black 40%,
+    rgba(0, 0, 0, 0.5) 60%,
+    transparent 82%
+  );
+  mask: radial-gradient(
+    closest-side,
+    transparent 0%,
+    transparent 6%,
+    rgba(0, 0, 0, 0.4) 12%,
+    black 22%,
+    black 40%,
+    rgba(0, 0, 0, 0.5) 60%,
+    transparent 82%
+  );
+  filter: blur(1.8px);
+}
+
 .sun-flare__starburst {
   position: absolute;
   top: 50%;
