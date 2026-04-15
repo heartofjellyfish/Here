@@ -57,7 +57,10 @@ body {
   background: var(--star);
   border-radius: 50%;
   opacity: var(--star-min, 0.08);
-  animation: twinkle ease-in-out infinite;
+  /* Twinkle timing comes in as CSS vars from each star's inline style
+     (see Starfield.tsx), which lets the flashing-state rule compose a
+     multi-animation shorthand using the same per-star values. */
+  animation: twinkle var(--tw-dur, 6s) ease-in-out var(--tw-delay, 0s) infinite;
 }
 
 @keyframes twinkle {
@@ -149,34 +152,55 @@ body {
   opacity: 1;
 }
 
+/* Two layered animations: `starFlashBurst` runs once (14s, forwards),
+   then `twinkleFromPeak` — delayed by the same 14s — kicks in and
+   cycles each star from its held peak (var(--star-max)) down to its
+   min and back. The chain never hands off to the plain `.star`
+   animation, because the class stays applied for the rest of the
+   session. This is the fix for the "snap back to baseline" the user
+   felt: removing the class at a fixed time dropped each star from its
+   burst-held peak to whatever frame the base `twinkle` was at on that
+   tick, which was effectively random per-star.
+   Per-star variety post-burst comes from each star's own --tw-dur
+   so the 150 stars desynchronize on their own within a few seconds. */
 .starfield--flashing .star {
-  animation: starFlashBurst 8000ms ease-out forwards;
+  animation:
+    starFlashBurst 14000ms ease-out forwards,
+    twinkleFromPeak var(--tw-dur, 6s) ease-in-out
+      calc(14000ms + var(--tw-delay, 0s)) infinite;
 }
 
-/* 8-second bloom. The previous ease-out over 5.5s still dumped most
-   of the brightness in the first second or two — visually the stars
-   "disappeared" rather than drifted down. The fix has two parts:
-     1. Extend duration to 8s so the long tail is genuinely long.
-     2. Break the timing function at 9%. Segments 0%→4%→9% use the
-        outer ease-out (fast rise, brief hold). At 9% we switch to
-        linear, so the 91% of duration spent dropping from peak to
-        baseline is spread evenly — a uniform disperse, not a
-        front-loaded decay.
-   This reads as mist slowly clearing. Per-segment animation-timing-
-   function is a real CSS feature, not a hack: when declared inside a
-   keyframe block it overrides the outer timing for that segment. */
+/* Mirror of `twinkle` with the phases flipped — starts at max so it
+   joins `starFlashBurst`'s 100% frame continuously. */
+@keyframes twinkleFromPeak {
+  0%,
+  100% {
+    opacity: var(--star-max);
+  }
+  50% {
+    opacity: var(--star-min);
+  }
+}
+
+/* 14-second bloom. The long tail is the whole point — 94% of duration
+   (~13.2s) is a linear descent from near-peak to each star's warmed
+   baseline, so "回归常态" happens imperceptibly slowly. The rise and
+   brief hold are packed into the first ~840ms, then at 6% we switch
+   to linear timing so the decay isn't front-loaded like an ease-out.
+   Per-keyframe `animation-timing-function` overrides the outer timing
+   for the segment starting at that keyframe — standard CSS. */
 @keyframes starFlashBurst {
   0% {
     opacity: var(--star-min);
     transform: scale(1);
     filter: none;
   }
-  4% {
+  3% {
     opacity: 1;
     transform: scale(2.5);
     filter: blur(0.6px);
   }
-  9% {
+  6% {
     opacity: 0.96;
     transform: scale(2.1);
     filter: blur(0.5px);

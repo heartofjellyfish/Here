@@ -51,13 +51,15 @@ const STAR_COUNT = 90;
 // sky; afterward they settle onto a very low but non-zero baseline.
 // The sky never quite goes back to how sparse it was.
 const FLASH_STAR_COUNT = 60;
-// The burst class stays applied long enough for the decay to feel like
-// mist slowly dispersing rather than a fade. 8s is deliberate: the peak
-// happens in the first ~400ms, leaving ~7.3s for a linear approach to
-// each star's warmed baseline (see globals.css — the keyframe at 9%
-// switches to linear timing so the long tail isn't front-loaded like
-// an ease-out).
-const FLASH_MS = 8000;
+// The burst is CSS-driven (globals.css, `.starfield--flashing .star`).
+// Once the class is applied we never remove it: `starFlashBurst` runs
+// for 14s with `forwards`, and a second layered animation —
+// `twinkleFromPeak`, delayed 14s — picks up from the same final frame
+// and cycles each star from its max down to its min forever. Chaining
+// in CSS (rather than toggling the class off at an arbitrary moment)
+// is what avoids the "snap back to baseline" we saw before: removing
+// the class mid-animation dropped each star to whatever phase the
+// base `twinkle` happened to be at, which read as a sudden dim.
 // Permanent boost to each star's twinkle range after the tap. Sets the
 // baseline the ordinary sky lives at for the rest of the session.
 // The previous 1.4 read as "a bit warmer"; 1.8 reads as "noticeably
@@ -206,15 +208,18 @@ export default function Starfield({ flashAt = null, earthSize = 340 }: Props) {
   // flash, never a replay of a past one. Warming is toggled at the
   // *same* tick as flashing — React batches, so the burst animation
   // (which overrides the regular twinkle) starts with the boosted
-  // --star-min/max baselines already in place, and the handback to
-  // twinkle at burst end is a continuous motion rather than a step.
+  // --star-min/max baselines already in place.
+  //
+  // We never turn `flashing` back off. The CSS chain (burst → forwards
+  // → twinkleFromPeak) carries each star from its held peak into an
+  // infinite cycle around the warmed baseline, all within the same
+  // class — no class removal, no opacity discontinuity.
   useEffect(() => {
     if (flashAt == null) return;
     const delay = Math.max(0, flashAt - Date.now());
     const onTimer = window.setTimeout(() => {
       setWarmed(true);
       setFlashing(true);
-      window.setTimeout(() => setFlashing(false), FLASH_MS);
     }, delay);
     return () => window.clearTimeout(onTimer);
   }, [flashAt]);
@@ -240,8 +245,13 @@ export default function Starfield({ flashAt = null, earthSize = 340 }: Props) {
               top: `${s.y}%`,
               width: `${s.size}px`,
               height: `${s.size}px`,
-              animationDuration: `${s.twinkleDur}s`,
-              animationDelay: `${s.delay}s`,
+              // Expose twinkle timing as CSS vars (rather than
+              // animation-duration/delay inline) so `.starfield--flashing
+              // .star` can compose its multi-animation shorthand from
+              // them. Inline longhands beat stylesheet shorthands on
+              // specificity, which would otherwise break the chain.
+              "--tw-dur": `${s.twinkleDur}s`,
+              "--tw-delay": `${s.delay}s`,
               "--star-min": (s.minOpacity * boost).toFixed(3),
               "--star-max": Math.min(1, s.maxOpacity * boost).toFixed(3),
             } as React.CSSProperties
