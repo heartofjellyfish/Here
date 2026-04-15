@@ -5,21 +5,27 @@ import { COUNTRY_COORDS } from "@/lib/countries";
 
 /**
  * A single "resonance ritual" dispatched by Scene after a tap. Earth
- * owns the choreography: a 1.5-turn sweep lighting every country as it
- * passes the front meridian, stopping on the primary country with its
- * point at dead center, holding, fading, then seamlessly handing the
- * earth back to its idle rotation.
+ * owns the choreography, four phases back-to-back:
+ *
+ *   snap    earth eases from its current rotation to the user's own
+ *           country; at the end, that country ignites first
+ *   sweep   one slow full turn forward from there — every other recent
+ *           country lights as it passes the front meridian, so the
+ *           lights bloom in step with what the viewer actually sees
+ *   flash   sweep ends right back at the user's point; the earth
+ *           holds still while the entire universe flashes
+ *   fade    everything dims together, earth resumes its idle rotation
  *
  * Times are wall-clock (Date.now()) — the outer scheduler and the
- * canvas loop use the same reference frame. Durations are passed in so
- * the component doesn't need to know the Scene-side constants.
+ * canvas loop use the same reference frame.
  */
 export interface Ritual {
   startAt: number;
   primaryCountry: string | null;
   countries: string[];
+  snapMs: number;
   sweepMs: number;
-  holdMs: number;
+  flashMs: number;
   fadeMs: number;
 }
 
@@ -420,14 +426,17 @@ function forwardDelta(from: number, to: number): number {
 // restarting the animation loop.
 type ActiveRitual = {
   startAt: number;
+  snapMs: number;
   sweepMs: number;
-  holdMs: number;
+  flashMs: number;
   fadeMs: number;
   /** Rotation at startAt (continuous with idle rotation before). */
   rotStart: number;
-  /** Rotation when sweep ends — primary's rotIdeal, one full turn + delta. */
-  rotEnd: number;
-  totalAngle: number;
+  /** Forward angular delta during the snap phase (0 if no primary). */
+  snapDelta: number;
+  /** Rotation when snap ends — primary sits at front center. Also
+   *  where the sweep begins and, by construction, ends. */
+  rotPrimaryIdeal: number;
   primaryCountry: string | null;
   litAt: Map<string, number>;
   /** Jittered (lat, lon) per country, precomputed so the target-snap and
@@ -464,8 +473,8 @@ export default function Earth({ size = 320, ritual = null }: Props) {
     const litAt = new Map<string, number>();
 
     const primary = ritual.primaryCountry;
-    let totalAngle = Math.PI * 2; // at minimum, one clean rotation
-    let rotEnd = rotStart + totalAngle;
+    let snapDelta = 0;
+    let rotPrimaryIdeal = rotStart;
 
     if (primary && COUNTRY_COORDS[primary]) {
       const pj = findLandJitter(
@@ -477,19 +486,22 @@ export default function Earth({ size = 320, ritual = null }: Props) {
       jPos.set(primary, pj);
       const w = latLonToVec(pj[0], pj[1]);
       const rotIdeal = Math.atan2(-w[0], w[2]);
-      // 2π baseline + forward slice so the earth performs between 1.0
-      // and 2.0 full turns, averaging 1.5. The "+2π" is what makes the
-      // sweep feel ceremonial instead of a single snap.
-      const fwd = forwardDelta(rotStart, rotIdeal);
-      rotEnd = rotStart + Math.PI * 2 + fwd;
-      totalAngle = rotEnd - rotStart;
-      litAt.set(primary, ritual.startAt + ritual.sweepMs);
+      // Forward-only snap so the camera moves with the rotation
+      // direction, never against it. Feels like the globe is turning
+      // to face the viewer rather than rewinding.
+      snapDelta = forwardDelta(rotStart, rotIdeal);
+      rotPrimaryIdeal = rotStart + snapDelta;
+      // Primary ignites the moment the camera lands on it.
+      litAt.set(primary, ritual.startAt + ritual.snapMs);
     }
 
-    // Non-primary countries light the first time the sweep passes them.
-    // Convert angular progress → time via the inverse of ease-out-cubic,
-    // so lights appear in lock-step with the visible rotation, not on
-    // some unrelated linear schedule.
+    // Sweep is exactly one forward turn from rotPrimaryIdeal, which
+    // lands the camera right back on the primary. Every non-primary
+    // country crosses the front meridian exactly once during this turn
+    // — we pre-compute the moment for each so lights appear in
+    // lock-step with the visible rotation (linear sweep → linear
+    // distribution in time).
+    const sweepAngle = Math.PI * 2;
     for (const c of ritual.countries) {
       if (c === primary) continue;
       if (!COUNTRY_COORDS[c]) continue;
@@ -502,22 +514,20 @@ export default function Earth({ size = 320, ritual = null }: Props) {
       jPos.set(c, pj);
       const w = latLonToVec(pj[0], pj[1]);
       const rotIdeal = Math.atan2(-w[0], w[2]);
-      const fwd = forwardDelta(rotStart, rotIdeal);
-      // totalAngle ≥ 2π ≥ fwd, so every country is covered.
-      const x = Math.min(1, fwd / totalAngle);
-      // inverse of eased = 1 - (1-p)^3 → p = 1 - (1-eased)^(1/3)
-      const tFrac = 1 - Math.pow(1 - x, 1 / 3);
-      litAt.set(c, ritual.startAt + ritual.sweepMs * tFrac);
+      const fwd = forwardDelta(rotPrimaryIdeal, rotIdeal);
+      const tFrac = fwd / sweepAngle;
+      litAt.set(c, ritual.startAt + ritual.snapMs + ritual.sweepMs * tFrac);
     }
 
     activeRef.current = {
       startAt: ritual.startAt,
+      snapMs: ritual.snapMs,
       sweepMs: ritual.sweepMs,
-      holdMs: ritual.holdMs,
+      flashMs: ritual.flashMs,
       fadeMs: ritual.fadeMs,
       rotStart,
-      rotEnd,
-      totalAngle,
+      snapDelta,
+      rotPrimaryIdeal,
       primaryCountry: primary,
       litAt,
       jPos,
@@ -563,33 +573,43 @@ export default function Earth({ size = 320, ritual = null }: Props) {
       ctx.clearRect(0, 0, BUF, BUF);
 
       // ---- Resolve rotation for this frame ----
-      // Three regimes: idle (baseRot + rotOffset), sweeping (override
-      // with eased interpolation from rotStart → rotEnd), and hold+fade
-      // (frozen at rotEnd). On exit we commit the final rotation into
-      // rotOffset so the next idle frame rolls forward from the same
-      // place the ritual stopped.
+      // Regimes: idle → snap (ease-in-out toward primary) → sweep
+      // (linear, exactly one forward turn back to primary) → flash
+      // (held at primary while the sky blooms) → fade (still held)
+      // → idle again. On the final transition we commit the rotation
+      // into rotOffset so idle picks up without a visible jump.
       const realNow = Date.now();
       const active = activeRef.current;
       let rot: number;
 
       if (active) {
-        const sweepEnd = active.startAt + active.sweepMs;
-        const holdEnd = sweepEnd + active.holdMs;
-        const fadeEnd = holdEnd + active.fadeMs;
+        const snapEnd = active.startAt + active.snapMs;
+        const sweepEnd = snapEnd + active.sweepMs;
+        const flashEnd = sweepEnd + active.flashMs;
+        const fadeEnd = flashEnd + active.fadeMs;
 
         if (realNow <= active.startAt) {
           rot =
             (t / ROTATION_PERIOD_MS) * Math.PI * 2 + rotOffsetRef.current;
+        } else if (realNow <= snapEnd) {
+          // Ease-in-out cosine: starts from (near) rest, accelerates,
+          // settles softly on the primary. No abrupt camera flick.
+          const p = (realNow - active.startAt) / active.snapMs;
+          const eased = (1 - Math.cos(Math.PI * p)) / 2;
+          rot = active.rotStart + active.snapDelta * eased;
         } else if (realNow <= sweepEnd) {
-          const p = (realNow - active.startAt) / active.sweepMs;
-          const eased = 1 - Math.pow(1 - p, 3);
-          rot = active.rotStart + active.totalAngle * eased;
+          // Linear constant-speed sweep — slow and unhurried. Linear
+          // (rather than eased) also means each country's pre-computed
+          // lit-time lands exactly when the camera passes it.
+          const p = (realNow - snapEnd) / active.sweepMs;
+          rot = active.rotPrimaryIdeal + Math.PI * 2 * p;
         } else if (realNow <= fadeEnd) {
-          rot = active.rotEnd;
+          // Held at primary through flash and fade.
+          rot = active.rotPrimaryIdeal + Math.PI * 2;
         } else {
-          // Seamless handoff: set rotOffset so baseRot(t) + rotOffset = rotEnd.
+          // Seamless handoff.
           const baseAt = (t / ROTATION_PERIOD_MS) * Math.PI * 2;
-          let off = active.rotEnd - baseAt;
+          let off = active.rotPrimaryIdeal + Math.PI * 2 - baseAt;
           off = Math.atan2(Math.sin(off), Math.cos(off));
           rotOffsetRef.current = off;
           activeRef.current = null;
@@ -700,15 +720,17 @@ export default function Earth({ size = 320, ritual = null }: Props) {
       }
 
       // ------ ritual highlights ------
-      // Points light one-by-one during the sweep, bloom to full
-      // intensity, then all fade together through the hold/fade tail.
+      // Primary ignites at snap end. Other points light one-by-one as
+      // the slow sweep passes them. All stay on through the flash,
+      // then dim together during the fade.
       if (active) {
-        const sweepEnd = active.startAt + active.sweepMs;
-        const fadeStart = sweepEnd + active.holdMs;
+        const snapEnd = active.startAt + active.snapMs;
+        const sweepEnd = snapEnd + active.sweepMs;
+        const fadeStart = sweepEnd + active.flashMs;
         const fadeEnd = fadeStart + active.fadeMs;
 
         // Shared fade envelope — all points dim in unison after the
-        // hold, so the picture resolves into a single held breath
+        // flash, so the picture resolves into a single held breath
         // instead of each point going out on its own schedule.
         let shared: number;
         if (realNow < fadeStart) shared = 1;

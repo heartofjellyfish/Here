@@ -23,16 +23,19 @@ type TapResponse = {
 };
 
 // ---- Ritual timing ----
-// After the user taps, the phrase wisps into the earth, the earth
-// performs a one-and-a-half-turn sweep lighting every recent country as
-// it passes beneath the meridian, stops on the user's own country with
-// the brightest point, holds, fades, and resumes rotation. At the same
-// moment the primary point blooms, the whole universe flashes once —
-// the sky, quietly, cheering the person on.
+// After the user taps, the phrase wisps into the earth and the ritual
+// begins:
+//   SNAP    earth eases to the user's own country and ignites it first
+//   SWEEP   one slow full turn — every other recent country lights as
+//           it passes beneath the meridian
+//   RETURN  sweep ends right back at the user's point (by construction)
+//   FLASH   earth holds; the entire universe flashes for 2 seconds
+//   FADE    all lights dim together, earth resumes its idle rotation
 const DISSOLVE_MS = 1600;
-const SWEEP_MS = 3600;
-const HOLD_MS = 1000;
-const FADE_MS = 800;
+const SNAP_MS = 1400;
+const SWEEP_MS = 5000;
+const FLASH_MS = 2000;
+const FADE_MS = 1000;
 
 export default function Scene({ lang }: { lang: Lang }) {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -115,14 +118,15 @@ export default function Scene({ lang }: { lang: Lang }) {
         startAt,
         primaryCountry,
         countries,
+        snapMs: SNAP_MS,
         sweepMs: SWEEP_MS,
-        holdMs: HOLD_MS,
+        flashMs: FLASH_MS,
         fadeMs: FADE_MS,
       });
-      // Universe flash peaks as the primary point blooms (near sweep end).
-      // Scheduling slightly *before* the bloom lets the flash rise and
-      // meet the light instead of following behind it.
-      setFlashAt(startAt + SWEEP_MS - 200);
+      // Flash fires the moment the sweep completes and the camera
+      // lands back on the user's point. The earth holds still for the
+      // full 2 seconds of the flash before the fade begins.
+      setFlashAt(startAt + SNAP_MS + SWEEP_MS);
       setPhase("revealed");
 
       // Let Earth drive the ritual off the canvas. Once the fade has
@@ -130,7 +134,7 @@ export default function Scene({ lang }: { lang: Lang }) {
       // loop — the rotation keeps rolling, no highlights, no snap.
       setTimeout(() => {
         setRitual(null);
-      }, SWEEP_MS + HOLD_MS + FADE_MS + 400);
+      }, SNAP_MS + SWEEP_MS + FLASH_MS + FADE_MS + 400);
     }, DISSOLVE_MS);
   }
 

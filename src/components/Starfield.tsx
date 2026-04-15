@@ -45,7 +45,7 @@ type Meteor = {
 };
 
 const STAR_COUNT = 90;
-const FLASH_MS = 1200;
+const FLASH_MS = 2000;
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
