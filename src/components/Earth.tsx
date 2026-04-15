@@ -673,11 +673,13 @@ export default function Earth({
     let rotPrimaryIdeal = rotStart;
 
     if (primary && COUNTRY_COORDS[primary]) {
-      const pj = findLandJitter(
+      // Use the same hotspot-aware placement as witnesses and the
+      // home dot, seeded by ritual.startAt so the primary's ritual
+      // position and the pinned home dot after fade land on the
+      // *exact same pixel* — no visible jump at the handoff.
+      const pj = findPopulationWeightedJitter(
         seedFor(ritual.startAt, primary),
-        COUNTRY_COORDS[primary],
-        2,
-        3,
+        primary,
       );
       jPos.set(primary, pj);
       const w = latLonToVec(pj[0], pj[1]);
@@ -703,12 +705,11 @@ export default function Earth({
     for (const c of ritual.countries) {
       if (c === primary) continue;
       if (!COUNTRY_COORDS[c]) continue;
-      const pj = findLandJitter(
-        seedFor(ritual.startAt, c),
-        COUNTRY_COORDS[c],
-        6,
-        10,
-      );
+      // Same hotspot-aware placement the witnesses use, so the ritual
+      // chorus and the later witness stream read as one coherent world
+      // — a country doesn't light Beijing during the sweep and then
+      // Tibet in witness mode.
+      const pj = findPopulationWeightedJitter(seedFor(ritual.startAt, c), c);
       jPos.set(c, pj);
       const w = latLonToVec(pj[0], pj[1]);
       const rotIdeal = Math.atan2(-w[0], w[2]);

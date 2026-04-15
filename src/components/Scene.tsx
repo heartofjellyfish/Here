@@ -243,7 +243,12 @@ export default function Scene({ lang }: { lang: Lang }) {
         setRitual(null);
         const handoffAt = Date.now();
         if (primaryCountry) {
-          setHome({ country: primaryCountry, startAt: handoffAt });
+          // Seed the home dot with the ritual's startAt (not the
+          // handoff moment). Earth uses seedFor(home.startAt, country)
+          // to pick the jittered land position; matching the ritual's
+          // seed guarantees the home dot lands on the exact same
+          // pixel the primary was lit on — no visible jump.
+          setHome({ country: primaryCountry, startAt: startAt });
         }
         setWitnessActiveAt(handoffAt);
       }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS);
