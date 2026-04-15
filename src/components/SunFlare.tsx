@@ -61,11 +61,13 @@ const SUN_CYCLE_MS = 153_000;
 // which felt like it overstayed.
 const FLARE_WINDOW_START = 9;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
-// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 56 → 10% past peak
-// → ~15.3s of fade past zenith (effectively "16s past peak"). Well
-// short of the original 82 (which lingered ~55s into the sun's
-// descent) but generous enough that the fall doesn't feel clipped.
-const FLARE_WINDOW_END = 56;
+// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 59 → 13% past peak
+// → ~19.9s fade past zenith. The shape of the fade (see the
+// envelope calc below) drops quickly at first then settles into a
+// long slow tail, so "mostly gone" happens around half the window
+// and "completely gone" only at the very end — reads as the flare
+// losing energy gradually rather than snapping off.
+const FLARE_WINDOW_END = 59;
 
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
@@ -140,7 +142,7 @@ const GHOSTS: GhostDef[] = [
   // the aperture blades because the reflection formed close to the
   // stopped-down iris, and it shows depth rather than reading as a
   // solid disc.
-  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
+  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 1.4, sizePhase: 3.3 },
   // Subtly cool disc sitting where the hex used to be. The
   // chromatic-separation job it was doing still needs doing —
   // one cool patch breaks up the otherwise all-amber chain —
@@ -190,13 +192,18 @@ export default function SunFlare() {
       const now = performance.now();
       const cyclePct = ((now % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
 
-      // Envelope: zero outside the window, two quarter-sines joined
-      // at the peak so the curve rises slowly from START→PEAK and
-      // falls faster from PEAK→END. Peak is pinned to the sun's
-      // zenith (46%), not the window midpoint — a symmetric bell
-      // would peak at (8+62)/2 = 35, i.e. before zenith, which looks
-      // wrong. Asymmetry also lets the flare clear out once the sun
-      // is past its high point instead of lingering through descent.
+      // Envelope: zero outside the window. Peak is pinned to the
+      // sun's zenith (46%), not the window midpoint — a symmetric
+      // bell would peak before zenith, which looks wrong.
+      //   Rise (START → PEAK): quarter-sine — slow start, building.
+      //   Fall (PEAK → END):   pow(1-u, 2.2) — drops ~half in the
+      //                        first 30% of the fall window, then a
+      //                        long slow tail that reaches zero at
+      //                        the very end. Feels like the flare
+      //                        losing energy gradually, not snapping
+      //                        off; "mostly gone" lives around the
+      //                        midpoint of the fall, "completely
+      //                        gone" only at the end.
       let envelope = 0;
       if (cyclePct >= FLARE_WINDOW_START && cyclePct <= FLARE_WINDOW_END) {
         if (cyclePct < FLARE_WINDOW_PEAK) {
@@ -208,7 +215,7 @@ export default function SunFlare() {
           const u =
             (cyclePct - FLARE_WINDOW_PEAK) /
             (FLARE_WINDOW_END - FLARE_WINDOW_PEAK);
-          envelope = Math.cos((u * Math.PI) / 2);
+          envelope = Math.pow(1 - u, 2.2);
         }
       }
 
@@ -258,16 +265,18 @@ export default function SunFlare() {
 
         // Size driven by two independent sources so the chain
         // doesn't inflate in lockstep:
-        //   1. defocus × per-ghost response — physics-ish; the
-        //      ring pumps hard (×1.4), the already-huge anchor
-        //      barely grows (×0.2), glint stays crisp (×0.25).
+        //   1. defocus × per-ghost response × global defocus gain.
+        //      Global gain 2.5 makes near-axis bloom dramatic (the
+        //      "奇观" moment when the lens stares into the source).
+        //      Per-ghost response picks who swells most: anchor and
+        //      ring pump hard, glint stays crisp.
         //   2. per-ghost size wobble on its own sine phase — gives
         //      each reflection its own breath independent of the
         //      sun's position. Small amplitude so it reads as
         //      shimmer, not jitter.
         const sizeWobble =
           1 + 0.07 * Math.sin(g.sizePhase + cyclePct * 0.11);
-        const scale = (1 + defocus * g.defocusResponse * 0.8) * sizeWobble;
+        const scale = (1 + defocus * g.defocusResponse * 2.5) * sizeWobble;
 
         // Alpha wobble: per-ghost sine so each one breathes at
         // its own phase. Range 0.8–1.0, so ghosts never go to
