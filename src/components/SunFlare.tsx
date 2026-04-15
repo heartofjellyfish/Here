@@ -499,6 +499,40 @@ export default function SunFlare() {
 
   return (
     <div className="sun-flare" aria-hidden="true">
+      {/* Turbulence filter for god rays — breaks the clean
+          repeating-conic-gradient shafts into fuzzy, variable-length
+          strands. Without it the rays read as uniform spokes, very
+          CSS-obvious. With it they read as light scattering through
+          uneven atmosphere — which is the actual physics.
+          baseFrequency is anisotropic (low X, high Y) to make the
+          noise streaky rather than granular, so the displacement
+          elongates strands along the local ray direction instead of
+          dotting them with uniform speckle. Scale kept modest (18)
+          so the cone shape still reads as a cone and doesn't melt
+          into abstract noise. */}
+      <svg
+        aria-hidden="true"
+        width="0"
+        height="0"
+        style={{ position: "absolute", pointerEvents: "none" }}
+      >
+        <filter id="sun-flare-rays-turbulence">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.018 0.55"
+            numOctaves="2"
+            seed="4"
+            result="noise"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="22"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </svg>
       <div ref={godRaysRef} className="sun-flare__rays" />
       <div ref={axisRef} className="sun-flare__axis" />
       <div ref={starburstRef} className="sun-flare__starburst" />

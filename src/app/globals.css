@@ -652,7 +652,18 @@ body {
       transparent 360deg
     );
   mask-composite: intersect;
-  filter: blur(1.8px);
+  /* Turbulence first, then blur. The SVG turbulence filter
+     (defined inline in SunFlare.tsx) breaks the clean conic
+     spokes into variable-length fuzzy strands — "毛毛躁躁"
+     like real volumetric scatter through uneven air, rather
+     than CSS-obvious uniform spokes. Blur after softens the
+     displaced edges so they read as light, not noise.
+     Performance note: SVG filters on large elements are GPU-
+     expensive. Mitigated here by the narrow time window (god
+     rays only render for ~16s around peak) and by the element
+     being opacity:0 outside that window, which lets the
+     compositor skip filter evaluation entirely. */
+  filter: url(#sun-flare-rays-turbulence) blur(1.8px);
 }
 
 /* Optical axis streak — a soft glowing trace along the line from
