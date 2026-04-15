@@ -52,10 +52,12 @@ const STAR_COUNT = 90;
 // The sky never quite goes back to how sparse it was.
 const FLASH_STAR_COUNT = 60;
 // The burst class stays applied long enough for the decay to feel like
-// a long exhale rather than a snap off. 5.5s is deliberate: the peak
-// happens in the first ~600ms, leaving the remaining ~4.9s as a
-// single, slowly-resolving approach to each star's warmed baseline.
-const FLASH_MS = 5500;
+// mist slowly dispersing rather than a fade. 8s is deliberate: the peak
+// happens in the first ~400ms, leaving ~7.3s for a linear approach to
+// each star's warmed baseline (see globals.css — the keyframe at 9%
+// switches to linear timing so the long tail isn't front-loaded like
+// an ease-out).
+const FLASH_MS = 8000;
 // Permanent boost to each star's twinkle range after the tap. Sets the
 // baseline the ordinary sky lives at for the rest of the session.
 // The previous 1.4 read as "a bit warmer"; 1.8 reads as "noticeably

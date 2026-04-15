@@ -150,35 +150,37 @@ body {
 }
 
 .starfield--flashing .star {
-  animation: starFlashBurst 5500ms ease-out forwards;
+  animation: starFlashBurst 8000ms ease-out forwards;
 }
 
-/* 5.5-second bloom. The earlier version mapped a full, many-keyframe
-   decay curve by hand; it peaked beautifully but the tail had tiny
-   upward bumps for brighter stars (intermediate fixed opacities could
-   drop below the final --star-max). Now we keep only three shape
-   points: rise, peak sustain, and the warmed baseline — and let the
-   timing function carry the decay. `ease-out` on a long duration
-   produces a rapid early drop from peak followed by a very gentle
-   approach to baseline across the remaining ~4.5 seconds, which is
-   what "慢慢的回归平常" should feel like. The handback to the regular
-   twinkle animation lands on each star's already-warmed floor, so
-   there's no visible step. */
+/* 8-second bloom. The previous ease-out over 5.5s still dumped most
+   of the brightness in the first second or two — visually the stars
+   "disappeared" rather than drifted down. The fix has two parts:
+     1. Extend duration to 8s so the long tail is genuinely long.
+     2. Break the timing function at 9%. Segments 0%→4%→9% use the
+        outer ease-out (fast rise, brief hold). At 9% we switch to
+        linear, so the 91% of duration spent dropping from peak to
+        baseline is spread evenly — a uniform disperse, not a
+        front-loaded decay.
+   This reads as mist slowly clearing. Per-segment animation-timing-
+   function is a real CSS feature, not a hack: when declared inside a
+   keyframe block it overrides the outer timing for that segment. */
 @keyframes starFlashBurst {
   0% {
     opacity: var(--star-min);
     transform: scale(1);
     filter: none;
   }
-  5% {
+  4% {
     opacity: 1;
     transform: scale(2.5);
     filter: blur(0.6px);
   }
-  11% {
+  9% {
     opacity: 0.96;
     transform: scale(2.1);
     filter: blur(0.5px);
+    animation-timing-function: linear;
   }
   100% {
     opacity: var(--star-max);
