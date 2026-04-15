@@ -125,17 +125,22 @@ const GHOSTS: GhostDef[] = [
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
   // Large soft disc — the anchor of the chain, warmest mid-amber.
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
-  // COOL CYAN GHOST — the Interstellar move. Internal reflection
-  // off an element with a blue-shifted coating. Drops a patch of
-  // contrasting color into the middle of the chain so it reads as
-  // dichroic optics, not a single tinted decal.
-  { t: -0.68, size: 6, hue: "150, 205, 240", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
-  // Amber ghost, further along the chain.
+  // COOL CYAN RING — the Interstellar move. A second iris-style
+  // reflection, this one off a blue-coated element. Different
+  // size, color, and axial position from the amber ring above,
+  // so the pair reads as "two different internal surfaces" not
+  // "concentric bullseye." Lower defocusResponse than the amber
+  // ring because it's further from the optical stop.
+  { t: -0.68, size: 6, hue: "150, 205, 240", kind: "ring", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.9, sizePhase: 4.1 },
+  // Amber ghost — soft filled disc providing a warm bed between
+  // the cool cyan ring and the cooler purple ring further out.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
-  // Purple/magenta ghost — second chromatic break. Sits between
-  // the cool cyan and the deep red tail so the chain rolls across
-  // the spectrum rather than snapping between two colors.
-  { t: -1.15, size: 7, hue: "220, 150, 200", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
+  // PURPLE RING — third and last ring in the chain, deeper in
+  // color and smaller than the cyan one. Three rings work
+  // because each is a different hue and a different size; what
+  // reads as a bullseye is three *identical* concentric rings,
+  // not three distinct ones spread along the axis.
+  { t: -1.15, size: 7, hue: "220, 150, 200", kind: "ring", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 1.0, sizePhase: 5.6 },
   // Deep red tail — a real flare's far end is often the most
   // saturated because the long-path reflections accumulate
   // chromatic shift. Small and sharp again, not diffuse.
