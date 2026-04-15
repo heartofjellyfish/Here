@@ -291,10 +291,18 @@ body {
    y = 0.013 * x² - 10, so the apex sits ~10vh above viewport center
    and the endpoints are ~45vh below (near the bottom horizon).
    Day phase is 0 → 78% of the cycle; the remaining 22% is below-
-   horizon "night" where opacity is 0. */
+   horizon "night" where opacity is 0.
+   Ascent is deliberately non-linear in time: the first ~13s pack
+   most of the visible entry (opacity climbs to ~0.5 and the glow
+   reaches roughly a third of the viewport), after which the rate
+   gears down and the approach to zenith becomes a slow, steady
+   brightening. This matches the experienced shape of the app —
+   users tap within seconds of landing, so the warmth has to arrive
+   fast and then relax, rather than climb at a uniform pace for a
+   whole minute. */
 @keyframes sunArc {
-  /* --- sunrise (off-screen lower-left, rising slowly through the
-     lower-left quadrant of the viewport before climbing) --- */
+  /* --- sunrise (off-screen lower-left, rushing in for ~13s and
+     then slowing into a patient climb toward the zenith) --- */
   0% {
     transform: translate(-80vw, 60vh);
     opacity: 0;
@@ -302,32 +310,37 @@ body {
   /* ~0.9s in (0.6% of a 153s cycle), the first warm fringe touches
      the lower-left corner — the "光缓缓进来" moment. */
   0.6% {
-    transform: translate(-79vw, 59vh);
-    opacity: 0.06;
+    transform: translate(-78vw, 58vh);
+    opacity: 0.09;
   }
-  6% {
-    transform: translate(-70vw, 52vh);
-    opacity: 0.12;
+  /* ~3s: glow is visibly present in the lower-left quadrant. */
+  2% {
+    transform: translate(-70vw, 50vh);
+    opacity: 0.22;
   }
-  11% {
-    transform: translate(-62vw, 40vh);
-    opacity: 0.18;
+  /* ~7s: clearly encroaching on the viewport. */
+  4.5% {
+    transform: translate(-58vw, 35vh);
+    opacity: 0.36;
   }
-  17% {
-    transform: translate(-52vw, 25vh);
-    opacity: 0.32;
+  /* ~13s: the "this is really here" moment — glow covers roughly a
+     third of the screen. After this keyframe the spacing widens and
+     the climb slows into its long approach to zenith. */
+  8.5% {
+    transform: translate(-45vw, 20vh);
+    opacity: 0.5;
   }
-  24% {
-    transform: translate(-40vw, 11vh);
-    opacity: 0.48;
+  14% {
+    transform: translate(-36vw, 10vh);
+    opacity: 0.6;
   }
-  31% {
-    transform: translate(-26vw, -1vh);
-    opacity: 0.62;
+  22% {
+    transform: translate(-24vw, 0);
+    opacity: 0.72;
   }
-  38% {
-    transform: translate(-13vw, -7vh);
-    opacity: 0.82;
+  32% {
+    transform: translate(-12vw, -6vh);
+    opacity: 0.86;
   }
   /* --- zenith (crossing viewport center, gradient blinds the screen) --- */
   46% {
