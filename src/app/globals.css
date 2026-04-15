@@ -645,44 +645,13 @@ body {
      rays only render for ~16s around peak) and by the element
      being opacity:0 outside that window, which lets the
      compositor skip filter evaluation entirely. */
-  filter: url(#sun-flare-rays-turbulence) blur(1.8px);
-}
-
-/* Optical axis streak — a soft glowing trace along the line from
-   the sun, through the viewport center, out past the last ghost in
-   the chain. Without this, the sun-to-chain relationship is hard to
-   read (each ghost fades in quietly with nothing visibly connecting
-   them); with it, the whole chain is obviously on one axis.
-   Anchored at its left edge (transform-origin 0% 50%) so JS can
-   place that edge AT the sun and rotate it to point through the
-   chain. Gradient fades from warm at the sun end to transparent
-   past the tail. Kept soft with a heavy blur — it's atmosphere, not
-   a laser. */
-.sun-flare__axis {
-  position: absolute;
-  /* Viewport-centered anchor (same fix as .sun-flare__rays). With
-     top:0/left:0 the streak's anchor ended up at viewport (0,0),
-     so the line appeared to emanate from the upper-left corner of
-     the frame — the "white stick on the left" that had no business
-     being there. */
-  top: 50%;
-  left: 50%;
-  width: 180vw;
-  height: 2.5vh;
-  transform-origin: 0% 50%;
-  pointer-events: none;
-  opacity: 0;
-  will-change: transform, opacity;
-  background: linear-gradient(
-    to right,
-    rgba(255, 238, 205, 0.4) 0%,
-    rgba(255, 235, 195, 0.22) 8%,
-    rgba(255, 230, 180, 0.14) 22%,
-    rgba(255, 225, 170, 0.07) 42%,
-    rgba(255, 222, 165, 0.03) 68%,
-    transparent 90%
-  );
-  filter: blur(3.5px);
+  /* Blur bumped to 3.5px — after the two-stage turbulence the
+     strands are jagged; a softer blur melts the edges into the
+     background and gives the whole field the dreamy "迷离" quality
+     the user asked for. Too much more and the rays lose all
+     structure; this is the edge where they read as atmospheric
+     scatter rather than graphic elements. */
+  filter: url(#sun-flare-rays-turbulence) blur(3.5px);
 }
 
 .sun-flare__starburst {

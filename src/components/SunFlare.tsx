@@ -143,38 +143,23 @@ type GhostDef = {
 // it. One disc is slightly cool so the chain isn't a single-tone
 // amber stripe, but it stays desaturated enough to feel like
 // internal reflection rather than stained glass.
+// perpOffset is 0 for every ghost now. Previously small positive /
+// negative values nudged each ghost slightly off the strict axis
+// so the chain wouldn't look like a ruler-drawn line of beads —
+// but that also meant the axis streak visibly *didn't* pass through
+// ghost centers (user feedback: "没有穿成一串"). Staying strictly on
+// axis is the more important read: you can see the whole chain is
+// one physical line through the sun and the optical center. The
+// shimmer the offsets were providing is already covered by the
+// per-ghost alpha wobble and size wobble.
 const GHOSTS: GhostDef[] = [
-  // Bright glint between sun and center — the sharp hot pinpoint
-  // every real lens flare has closest to the source. Stays small
-  // and crisp: a real highlight doesn't bloom. This is the ONLY
-  // near-sun ghost now; previously there was also a small pale
-  // disc right after it, but the two read as redundant dots.
-  { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0.0, defocusResponse: 0.25, sizePhase: 0.2 },
-  // The *one* aperture-iris ring. Warm amber — the classic coated
-  // iris artifact. Highest defocusResponse: a real iris ring
-  // visibly pulses between tight and wide as the sun's off-axis
-  // angle changes.
-  { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
-  // The anchor — the biggest ghost in the chain, rendered as a
-  // hex with rim+core structure (bright iris band around a softer
-  // core). This is the Interstellar "signature" ghost: you can see
-  // the aperture blades because the reflection formed close to the
-  // stopped-down iris, and it shows depth rather than reading as a
-  // solid disc.
-  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 1.4, sizePhase: 3.3 },
-  // Subtly cool disc sitting where the hex used to be. The
-  // chromatic-separation job it was doing still needs doing —
-  // one cool patch breaks up the otherwise all-amber chain —
-  // but it doesn't need to be the hexagon.
-  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
-  // Amber ghost further along the chain.
-  { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
-  // Deepening amber approaching the tail. Warm-only from here
-  // so the chain resolves back to the scene's overall color
-  // mood.
-  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
-  // Small warm tail — sharper again at the far end of the chain.
-  { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
+  { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0, defocusResponse: 0.25, sizePhase: 0.2 },
+  { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: 0, defocusResponse: 1.4, sizePhase: 2.0 },
+  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0, defocusResponse: 1.4, sizePhase: 3.3 },
+  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: 0, defocusResponse: 0.8, sizePhase: 4.1 },
+  { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 0, defocusResponse: 0.35, sizePhase: 0.7 },
+  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: 0, defocusResponse: 0.9, sizePhase: 5.6 },
+  { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
 
 // Linearly interpolate sun position from the waypoint table.
@@ -194,7 +179,6 @@ export default function SunFlare() {
   const ghostRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starburstRef = useRef<HTMLDivElement | null>(null);
   const godRaysRef = useRef<HTMLDivElement | null>(null);
-  const axisRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -355,8 +339,21 @@ export default function SunFlare() {
           cyclePct < FLARE_WINDOW_PEAK ? 0.5 + envelope * 0.5 : 1;
         const sizeWobble =
           1 + 0.07 * Math.sin(g.sizePhase + cyclePct * 0.11);
+        // Size is now gated by defocus as well as riseGrowth:
+        //   defocusScale = 0.25 + defocus * 0.75
+        // When the sun is far off-axis (defocus near 0), every ghost
+        // shrinks to 25% of what the raw (1 + defocus*response*2.5)
+        // formula would give — so the chain reads as a row of small
+        // points strung along the axis, not a procession of giant
+        // rings overlapping each other. As the sun approaches center
+        // (defocus → 1) the ghosts bloom to full. Matches the user
+        // guidance "在升起的时候把全放小一点，直到快到中心了才慢慢变大".
+        const defocusScale = 0.25 + defocus * 0.75;
         const scale =
-          riseGrowth * (1 + defocus * g.defocusResponse * 2.5) * sizeWobble;
+          riseGrowth *
+          defocusScale *
+          (1 + defocus * g.defocusResponse * 2.5) *
+          sizeWobble;
 
         // Alpha wobble: per-ghost sine so each one breathes at
         // its own phase. Range 0.8–1.0, so ghosts never go to
@@ -442,48 +439,32 @@ export default function SunFlare() {
             rayEnv = Math.pow(1 - u, 1.8);
           }
         }
-        // Alpha capped deliberately low so the page stays readable.
-        const rayAlpha = rayEnv * 0.35;
-        // Rays fan omnidirectionally from the sun — the forward-cone
-        // mask was dropped because it read as "a wedge of parallel
-        // streaks in the upper half," not "rays radiating from a
-        // point." With the cone gone, the element just sits at the
-        // sun and the radial mask handles the brightness falloff.
-        // A very slow continuous rotation keeps the turbulence-
-        // displaced strands from looking frozen; the amplitude is
-        // ~360°/minute — slow enough that the eye doesn't read it
-        // as motion, only as liveness.
-        const rayRot = (now * 0.006) % 360;
+        // Alpha breathing: three incommensurate sines layered so the
+        // overall brightness never lands on the same value twice in
+        // the same window — reads as the atmosphere itself shifting
+        // in density, not as a CSS animation on a timer. Amplitudes
+        // sum to ~±0.25 of the base, enough to be felt but never
+        // strong enough to read as flicker. Base alpha dropped from
+        // 0.35 to 0.28 so the peak of the breath lands around the
+        // old cap rather than above it.
+        const rayBreath =
+          1 +
+          0.12 * Math.sin(now * 0.00031) +
+          0.09 * Math.sin(now * 0.00073 + 1.7) +
+          0.06 * Math.sin(now * 0.0013 + 3.1);
+        const rayAlpha = rayEnv * 0.28 * rayBreath;
+        // Rays fan omnidirectionally from the sun. Rotation is a
+        // slow continuous drift (~360°/min) *plus* a small wobble
+        // on an independent sine so it doesn't feel like a steady
+        // spin — gives the strands a little "current" as if they're
+        // drifting in air.
+        const rayRot =
+          (now * 0.006 + 8 * Math.sin(now * 0.00047)) % 360;
         godRaysRef.current.style.transform =
           `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
           `translate(-50%, -50%) ` +
           `rotate(${rayRot.toFixed(2)}deg)`;
         godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
-      }
-
-      // Optical axis streak — a soft glowing line that traces the
-      // axis from the sun THROUGH the viewport center and out past
-      // the ghost chain. Without it, the geometric relationship
-      // between the sun's position and the ghost chain is hard to
-      // read on the rise (each ghost fades in quietly and there's
-      // nothing visibly connecting them to the sun). With it, the
-      // whole chain reads as "one axis, many artifacts along it."
-      if (axisRef.current) {
-        const axisAlpha = envelope * 0.42;
-        const sunDistForAxis = Math.hypot(rawSx, rawSy);
-        // Orient from the sun AWAY from the origin — the element is
-        // anchored at its left edge (transform-origin 0% 50%), so
-        // rotating it by (sun→origin direction + 180°) sends its
-        // tail past the origin and through the ghost chain.
-        const axisDeg =
-          sunDistForAxis > 0.01
-            ? (Math.atan2(rawSy, rawSx) * 180) / Math.PI + 180
-            : 0;
-        axisRef.current.style.transform =
-          `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
-          `translate(0, -50%) ` +
-          `rotate(${axisDeg.toFixed(2)}deg)`;
-        axisRef.current.style.opacity = Math.max(0, Math.min(1, axisAlpha)).toFixed(3);
       }
 
       raf = requestAnimationFrame(tick);
@@ -512,25 +493,46 @@ export default function SunFlare() {
         height="0"
         style={{ position: "absolute", pointerEvents: "none" }}
       >
+        {/* Two-stage turbulence: a low-frequency warp bends whole
+            swaths of rays into curved, watery drifts; a higher-
+            frequency displacement breaks those drifts into
+            variable-length fuzzy strands. Stacking the two gives
+            the "迷离" quality — individual rays aren't identifiable,
+            the whole field reads as atmospheric scatter rather
+            than a pinwheel. */}
         <filter id="sun-flare-rays-turbulence">
           <feTurbulence
             type="fractalNoise"
-            baseFrequency="0.018 0.55"
+            baseFrequency="0.006 0.04"
             numOctaves="2"
-            seed="4"
-            result="noise"
+            seed="7"
+            result="bigNoise"
           />
           <feDisplacementMap
             in="SourceGraphic"
-            in2="noise"
-            scale="22"
+            in2="bigNoise"
+            scale="55"
+            xChannelSelector="R"
+            yChannelSelector="G"
+            result="warped"
+          />
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.03 0.7"
+            numOctaves="2"
+            seed="4"
+            result="fineNoise"
+          />
+          <feDisplacementMap
+            in="warped"
+            in2="fineNoise"
+            scale="28"
             xChannelSelector="R"
             yChannelSelector="G"
           />
         </filter>
       </svg>
       <div ref={godRaysRef} className="sun-flare__rays" />
-      <div ref={axisRef} className="sun-flare__axis" />
       <div ref={starburstRef} className="sun-flare__starburst" />
       {GHOSTS.map((g, i) => (
         <div
