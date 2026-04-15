@@ -153,6 +153,13 @@ type GhostDef = {
 // shimmer the offsets were providing is already covered by the
 // per-ghost alpha wobble and size wobble.
 const GHOSTS: GhostDef[] = [
+  // Two glints on the sun-side of the axis. Physics says most same-
+  // side reflections collapse onto the sun itself, but the one or
+  // two paths that DO resolve as distinct ghosts sit between the sun
+  // and optical center. Having two reinforces the reading that
+  // "the chain is a line starting at the sun" — a single lone glint
+  // far from the others left the near-source end feeling sparse.
+  { t: 0.1, size: 1.3, hue: "255, 250, 225", kind: "glint", blur: 0.4, alphaPhase: 2.8, perpOffset: 0, defocusResponse: 0.2, sizePhase: 1.5 },
   { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0, defocusResponse: 0.25, sizePhase: 0.2 },
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: 0, defocusResponse: 1.4, sizePhase: 2.0 },
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0, defocusResponse: 1.4, sizePhase: 3.3 },
@@ -493,62 +500,6 @@ export default function SunFlare() {
 
   return (
     <div className="sun-flare" aria-hidden="true">
-      {/* Turbulence filter for god rays — breaks the clean
-          repeating-conic-gradient shafts into fuzzy, variable-length
-          strands. Without it the rays read as uniform spokes, very
-          CSS-obvious. With it they read as light scattering through
-          uneven atmosphere — which is the actual physics.
-          baseFrequency is anisotropic (low X, high Y) to make the
-          noise streaky rather than granular, so the displacement
-          elongates strands along the local ray direction instead of
-          dotting them with uniform speckle. Scale kept modest (18)
-          so the cone shape still reads as a cone and doesn't melt
-          into abstract noise. */}
-      <svg
-        aria-hidden="true"
-        width="0"
-        height="0"
-        style={{ position: "absolute", pointerEvents: "none" }}
-      >
-        {/* Two-stage turbulence: a low-frequency warp bends whole
-            swaths of rays into curved, watery drifts; a higher-
-            frequency displacement breaks those drifts into
-            variable-length fuzzy strands. Stacking the two gives
-            the "迷离" quality — individual rays aren't identifiable,
-            the whole field reads as atmospheric scatter rather
-            than a pinwheel. */}
-        <filter id="sun-flare-rays-turbulence">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.006 0.04"
-            numOctaves="2"
-            seed="7"
-            result="bigNoise"
-          />
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="bigNoise"
-            scale="55"
-            xChannelSelector="R"
-            yChannelSelector="G"
-            result="warped"
-          />
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.03 0.7"
-            numOctaves="2"
-            seed="4"
-            result="fineNoise"
-          />
-          <feDisplacementMap
-            in="warped"
-            in2="fineNoise"
-            scale="28"
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
-        </filter>
-      </svg>
       <div ref={godRaysRef} className="sun-flare__rays" />
       <div ref={starburstRef} className="sun-flare__starburst" />
       {GHOSTS.map((g, i) => (
