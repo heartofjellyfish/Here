@@ -45,14 +45,28 @@ type Meteor = {
 };
 
 const STAR_COUNT = 90;
-const FLASH_MS = 2000;
+// A second pool of fainter stars that live near the threshold of
+// visibility. Before the tap they're essentially asleep; during the
+// flash they bloom into view alongside the regulars, thickening the
+// sky; afterward they settle onto a very low but non-zero baseline.
+// The sky never quite goes back to how sparse it was.
+const FLASH_STAR_COUNT = 60;
+// The burst class stays applied long enough for the decay to feel like
+// a long exhale rather than a snap off. By the time it lifts, each star
+// is already riding its new, slightly-warmer baseline — so the
+// handback to the regular twinkle is a continuous motion, not a step.
+const FLASH_MS = 3500;
+// Permanent boost to each star's twinkle range after the tap. Subtle:
+// the point is "the sky feels a little warmer now," not "the sky got
+// notably lit up."
+const WARM_BOOST = 1.4;
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
 function generateStars(): Star[] {
-  return Array.from({ length: STAR_COUNT }, (_, i) => ({
+  const main: Star[] = Array.from({ length: STAR_COUNT }, (_, i) => ({
     id: i,
     x: rand(0, 100),
     y: rand(0, 100),
@@ -62,6 +76,20 @@ function generateStars(): Star[] {
     twinkleDur: rand(4, 10),
     delay: rand(0, 8),
   }));
+  // Sleeping stars: smaller, very faint at rest. The WARM_BOOST lifts
+  // them to "barely there" after the tap, and the flash burst catches
+  // their inline --star-min/max baseline at peak.
+  const flashers: Star[] = Array.from({ length: FLASH_STAR_COUNT }, (_, i) => ({
+    id: STAR_COUNT + i,
+    x: rand(0, 100),
+    y: rand(0, 100),
+    size: rand(0.4, 1.2),
+    minOpacity: rand(0.003, 0.012),
+    maxOpacity: rand(0.05, 0.14),
+    twinkleDur: rand(5, 11),
+    delay: rand(0, 8),
+  }));
+  return [...main, ...flashers];
 }
 
 type Props = {
@@ -75,6 +103,10 @@ export default function Starfield({ flashAt = null }: Props) {
   const [stars, setStars] = useState<Star[]>([]);
   const [meteors, setMeteors] = useState<Meteor[]>([]);
   const [flashing, setFlashing] = useState(false);
+  // Once the universe has flashed, it never goes back to pre-tap.
+  // The warmed state persists for the rest of the session: a gentle
+  // ambient wash over the sky, each star's baseline quietly lifted.
+  const [warmed, setWarmed] = useState(false);
   const nextId = useRef(0);
 
   useEffect(() => {
@@ -121,21 +153,31 @@ export default function Starfield({ flashAt = null }: Props) {
 
   // Universe flash. `flashAt` is a Date.now() moment; we schedule the
   // class toggle relative to now() so we only ever fire the upcoming
-  // flash, never a replay of a past one (e.g., if the prop is set in
-  // the past by mistake, we fire immediately rather than skipping).
+  // flash, never a replay of a past one. Warming is toggled at the
+  // *same* tick as flashing — React batches, so the burst animation
+  // (which overrides the regular twinkle) starts with the boosted
+  // --star-min/max baselines already in place, and the handback to
+  // twinkle at burst end is a continuous motion rather than a step.
   useEffect(() => {
     if (flashAt == null) return;
     const delay = Math.max(0, flashAt - Date.now());
     const onTimer = window.setTimeout(() => {
+      setWarmed(true);
       setFlashing(true);
       window.setTimeout(() => setFlashing(false), FLASH_MS);
     }, delay);
     return () => window.clearTimeout(onTimer);
   }, [flashAt]);
 
+  const boost = warmed ? WARM_BOOST : 1;
+
   return (
     <div
-      className={`starfield${flashing ? " starfield--flashing" : ""}`}
+      className={
+        "starfield" +
+        (warmed ? " starfield--warmed" : "") +
+        (flashing ? " starfield--flashing" : "")
+      }
       aria-hidden="true"
     >
       {stars.map((s) => (
@@ -150,8 +192,8 @@ export default function Starfield({ flashAt = null }: Props) {
               height: `${s.size}px`,
               animationDuration: `${s.twinkleDur}s`,
               animationDelay: `${s.delay}s`,
-              "--star-min": s.minOpacity.toFixed(3),
-              "--star-max": s.maxOpacity.toFixed(3),
+              "--star-min": (s.minOpacity * boost).toFixed(3),
+              "--star-max": Math.min(1, s.maxOpacity * boost).toFixed(3),
             } as React.CSSProperties
           }
         />

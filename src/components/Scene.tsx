@@ -25,14 +25,18 @@ type TapResponse = {
 // ---- Ritual timing ----
 // After the user taps, the phrase wisps into the earth and the ritual
 // begins:
-//   SNAP    earth eases to the user's own country and ignites it first
-//   SWEEP   one slow full turn — every other recent country lights as
-//           it passes beneath the meridian
-//   RETURN  sweep ends right back at the user's point (by construction)
-//   FLASH   earth holds; the entire universe flashes for 2 seconds
-//   FADE    all lights dim together, earth resumes its idle rotation
+//   SNAP     earth eases to the user's own country and ignites it
+//   IGNITE   earth holds still for a beat — the user's point alone on
+//            the globe, giving the "+1" a small ceremony instead of
+//            rushing into the sweep
+//   SWEEP    one slow full turn; every other recent country lights as
+//            it passes beneath the meridian
+//   RETURN   sweep ends right back at the user's point (by construction)
+//   FLASH    earth holds; the entire universe flashes for 2 seconds
+//   FADE     all lights dim together, earth resumes its idle rotation
 const DISSOLVE_MS = 1600;
 const SNAP_MS = 1400;
+const IGNITE_MS = 1000;
 const SWEEP_MS = 5000;
 const FLASH_MS = 2000;
 const FADE_MS = 1000;
@@ -119,6 +123,7 @@ export default function Scene({ lang }: { lang: Lang }) {
         primaryCountry,
         countries,
         snapMs: SNAP_MS,
+        igniteMs: IGNITE_MS,
         sweepMs: SWEEP_MS,
         flashMs: FLASH_MS,
         fadeMs: FADE_MS,
@@ -126,7 +131,7 @@ export default function Scene({ lang }: { lang: Lang }) {
       // Flash fires the moment the sweep completes and the camera
       // lands back on the user's point. The earth holds still for the
       // full 2 seconds of the flash before the fade begins.
-      setFlashAt(startAt + SNAP_MS + SWEEP_MS);
+      setFlashAt(startAt + SNAP_MS + IGNITE_MS + SWEEP_MS);
       setPhase("revealed");
 
       // Let Earth drive the ritual off the canvas. Once the fade has
@@ -134,7 +139,7 @@ export default function Scene({ lang }: { lang: Lang }) {
       // loop — the rotation keeps rolling, no highlights, no snap.
       setTimeout(() => {
         setRitual(null);
-      }, SNAP_MS + SWEEP_MS + FLASH_MS + FADE_MS + 400);
+      }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS + 400);
     }, DISSOLVE_MS);
   }
 

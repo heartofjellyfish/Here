@@ -5,10 +5,13 @@ import { COUNTRY_COORDS } from "@/lib/countries";
 
 /**
  * A single "resonance ritual" dispatched by Scene after a tap. Earth
- * owns the choreography, four phases back-to-back:
+ * owns the choreography, five phases back-to-back:
  *
  *   snap    earth eases from its current rotation to the user's own
  *           country; at the end, that country ignites first
+ *   ignite  earth holds still for a beat — one light, alone on the
+ *           globe, so the user's "+1" has its own small moment before
+ *           anything else moves
  *   sweep   one slow full turn forward from there — every other recent
  *           country lights as it passes the front meridian, so the
  *           lights bloom in step with what the viewer actually sees
@@ -24,6 +27,7 @@ export interface Ritual {
   primaryCountry: string | null;
   countries: string[];
   snapMs: number;
+  igniteMs: number;
   sweepMs: number;
   flashMs: number;
   fadeMs: number;
@@ -427,6 +431,7 @@ function forwardDelta(from: number, to: number): number {
 type ActiveRitual = {
   startAt: number;
   snapMs: number;
+  igniteMs: number;
   sweepMs: number;
   flashMs: number;
   fadeMs: number;
@@ -500,7 +505,9 @@ export default function Earth({ size = 320, ritual = null }: Props) {
     // country crosses the front meridian exactly once during this turn
     // — we pre-compute the moment for each so lights appear in
     // lock-step with the visible rotation (linear sweep → linear
-    // distribution in time).
+    // distribution in time). Sweep doesn't start until after the
+    // ignite hold, so chorus times carry an igniteMs offset.
+    const sweepStartMs = ritual.snapMs + ritual.igniteMs;
     const sweepAngle = Math.PI * 2;
     for (const c of ritual.countries) {
       if (c === primary) continue;
@@ -516,12 +523,13 @@ export default function Earth({ size = 320, ritual = null }: Props) {
       const rotIdeal = Math.atan2(-w[0], w[2]);
       const fwd = forwardDelta(rotPrimaryIdeal, rotIdeal);
       const tFrac = fwd / sweepAngle;
-      litAt.set(c, ritual.startAt + ritual.snapMs + ritual.sweepMs * tFrac);
+      litAt.set(c, ritual.startAt + sweepStartMs + ritual.sweepMs * tFrac);
     }
 
     activeRef.current = {
       startAt: ritual.startAt,
       snapMs: ritual.snapMs,
+      igniteMs: ritual.igniteMs,
       sweepMs: ritual.sweepMs,
       flashMs: ritual.flashMs,
       fadeMs: ritual.fadeMs,
@@ -584,7 +592,8 @@ export default function Earth({ size = 320, ritual = null }: Props) {
 
       if (active) {
         const snapEnd = active.startAt + active.snapMs;
-        const sweepEnd = snapEnd + active.sweepMs;
+        const igniteEnd = snapEnd + active.igniteMs;
+        const sweepEnd = igniteEnd + active.sweepMs;
         const flashEnd = sweepEnd + active.flashMs;
         const fadeEnd = flashEnd + active.fadeMs;
 
@@ -597,11 +606,16 @@ export default function Earth({ size = 320, ritual = null }: Props) {
           const p = (realNow - active.startAt) / active.snapMs;
           const eased = (1 - Math.cos(Math.PI * p)) / 2;
           rot = active.rotStart + active.snapDelta * eased;
+        } else if (realNow <= igniteEnd) {
+          // Ignite hold: rotation is frozen on primary. The user's
+          // point is alone on the globe, lit and steady, before
+          // anything else moves. Don't rush the +1.
+          rot = active.rotPrimaryIdeal;
         } else if (realNow <= sweepEnd) {
           // Linear constant-speed sweep — slow and unhurried. Linear
           // (rather than eased) also means each country's pre-computed
           // lit-time lands exactly when the camera passes it.
-          const p = (realNow - snapEnd) / active.sweepMs;
+          const p = (realNow - igniteEnd) / active.sweepMs;
           rot = active.rotPrimaryIdeal + Math.PI * 2 * p;
         } else if (realNow <= fadeEnd) {
           // Held at primary through flash and fade.
@@ -720,12 +734,13 @@ export default function Earth({ size = 320, ritual = null }: Props) {
       }
 
       // ------ ritual highlights ------
-      // Primary ignites at snap end. Other points light one-by-one as
-      // the slow sweep passes them. All stay on through the flash,
-      // then dim together during the fade.
+      // Primary ignites at snap end and holds alone through the ignite
+      // beat. The sweep then lights every other recent country in step
+      // with the rotation. All stay on through the flash, then dim
+      // together during the fade.
       if (active) {
-        const snapEnd = active.startAt + active.snapMs;
-        const sweepEnd = snapEnd + active.sweepMs;
+        const sweepEnd =
+          active.startAt + active.snapMs + active.igniteMs + active.sweepMs;
         const fadeStart = sweepEnd + active.flashMs;
         const fadeEnd = fadeStart + active.fadeMs;
 
