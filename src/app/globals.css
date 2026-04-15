@@ -292,7 +292,7 @@ body {
    and the endpoints are ~45vh below (near the bottom horizon).
    Day phase is 0 → 78% of the cycle; the remaining 22% is below-
    horizon "night" where opacity is 0.
-   Ascent is deliberately non-linear in time: the first ~13s pack
+   Ascent is deliberately non-linear in time: the first ~9s pack
    most of the visible entry (opacity climbs to ~0.5 and the glow
    reaches roughly a third of the viewport), after which the rate
    gears down and the approach to zenith becomes a slow, steady
@@ -301,7 +301,7 @@ body {
    fast and then relax, rather than climb at a uniform pace for a
    whole minute. */
 @keyframes sunArc {
-  /* --- sunrise (off-screen lower-left, rushing in for ~13s and
+  /* --- sunrise (off-screen lower-left, rushing in for ~9s and
      then slowing into a patient climb toward the zenith) --- */
   0% {
     transform: translate(-80vw, 60vh);
@@ -313,28 +313,28 @@ body {
     transform: translate(-78vw, 58vh);
     opacity: 0.09;
   }
-  /* ~3s: glow is visibly present in the lower-left quadrant. */
-  2% {
+  /* ~2.3s: glow is visibly present in the lower-left quadrant. */
+  1.5% {
     transform: translate(-70vw, 50vh);
     opacity: 0.22;
   }
-  /* ~7s: clearly encroaching on the viewport. */
-  4.5% {
+  /* ~4.6s: clearly encroaching on the viewport. */
+  3% {
     transform: translate(-58vw, 35vh);
     opacity: 0.36;
   }
-  /* ~13s: the "this is really here" moment — glow covers roughly a
+  /* ~9s: the "this is really here" moment — glow covers roughly a
      third of the screen. After this keyframe the spacing widens and
      the climb slows into its long approach to zenith. */
-  8.5% {
+  6% {
     transform: translate(-45vw, 20vh);
     opacity: 0.5;
   }
-  14% {
+  12% {
     transform: translate(-36vw, 10vh);
     opacity: 0.6;
   }
-  22% {
+  20% {
     transform: translate(-24vw, 0);
     opacity: 0.72;
   }
@@ -383,6 +383,136 @@ body {
   100% {
     transform: translate(-80vw, 60vh);
     opacity: 0;
+  }
+}
+
+/* ---------- Sun lens flare ----------
+   A brief cinematic artifact that fires only while the sun is
+   crossing viewport center. The off-screen sun's halo already washes
+   the screen at zenith; the flare adds the near-lens ghosts a real
+   camera would pick up shooting straight into direct light — a
+   diagonal chain of soft warm discs plus a faint anamorphic streak
+   across the optical axis. Locked to the same 153s cycle as
+   .sun-glow (no JS coordination), additive blended so it brightens
+   what's underneath rather than tinting it, and gone again in about
+   three seconds — "一闪而过" rather than sustained. The point is the
+   near-field element: shallow camera depth against the far backdrop
+   makes the whole frame feel more cinematic without adding anything
+   the user has to look at. */
+.sun-flare {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  /* Above .sun-glow (z:0) and the stage (z:1–2) so the ghosts can
+     pass over the earth the way a real camera flare would; below
+     .grain (z:5) so the grain still textures it. */
+  z-index: 4;
+  opacity: 0;
+  /* Additive: each spot brightens the pixels beneath without
+     dimming them. Critical for the "light leak" reading. */
+  mix-blend-mode: screen;
+  animation: sunFlarePass 153s linear infinite;
+}
+
+.sun-flare__spot,
+.sun-flare__streak {
+  position: absolute;
+  will-change: transform, opacity;
+}
+
+.sun-flare__spot {
+  border-radius: 50%;
+  filter: blur(3px);
+}
+
+/* Three ghost discs arrayed along the diagonal from upper-left to
+   lower-right — the canonical lens-flare axis (ghosts form opposite
+   the light source through the optical center, and the sun here
+   swings up from the lower-left). Each has its own tint and size so
+   they don't read as a row of identical dots. */
+.sun-flare__spot--a {
+  width: clamp(70px, 9vmax, 130px);
+  height: clamp(70px, 9vmax, 130px);
+  top: 22%;
+  left: 28%;
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 248, 220, 0.55),
+    rgba(255, 220, 160, 0.22) 45%,
+    transparent 78%
+  );
+}
+.sun-flare__spot--b {
+  width: clamp(42px, 5.5vmax, 80px);
+  height: clamp(42px, 5.5vmax, 80px);
+  top: 44%;
+  left: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 255, 240, 0.48),
+    rgba(255, 200, 130, 0.2) 50%,
+    transparent 80%
+  );
+}
+.sun-flare__spot--c {
+  width: clamp(55px, 7vmax, 100px);
+  height: clamp(55px, 7vmax, 100px);
+  top: 62%;
+  left: 68%;
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 230, 200, 0.42),
+    rgba(255, 180, 130, 0.16) 50%,
+    transparent 82%
+  );
+}
+
+/* Thin horizontal streak across the optical center — the classic
+   anamorphic line. Soft-edged so it reads as a smear of light
+   rather than a bar. */
+.sun-flare__streak {
+  top: 48%;
+  left: -10%;
+  width: 120%;
+  height: clamp(8px, 1.2vmax, 14px);
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 230, 200, 0.18) 20%,
+    rgba(255, 250, 230, 0.42) 50%,
+    rgba(255, 230, 200, 0.18) 80%,
+    transparent 100%
+  );
+  filter: blur(4px);
+}
+
+/* Dormant for most of the cycle; flashes around zenith (46%) and is
+   gone by ~47.5%. The small transform drift sells the idea that the
+   flare is sliding past as the angle between lens and light source
+   changes — static lens flares read as an overlay, moving ones read
+   as a moment. */
+@keyframes sunFlarePass {
+  0%,
+  45% {
+    opacity: 0;
+    transform: translate(-2.5vw, 0);
+  }
+  45.8% {
+    opacity: 0.35;
+    transform: translate(-1.2vw, 0);
+  }
+  46% {
+    opacity: 0.95;
+    transform: translate(0, 0);
+  }
+  46.4% {
+    opacity: 0.5;
+    transform: translate(1vw, 0);
+  }
+  47.5%,
+  100% {
+    opacity: 0;
+    transform: translate(2.5vw, 0);
   }
 }
 
@@ -739,6 +869,7 @@ body {
   .star,
   .meteor,
   .sun-glow,
+  .sun-flare,
   .reveal__ack,
   .reveal__resonance,
   .reveal__presence {

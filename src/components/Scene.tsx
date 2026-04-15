@@ -308,6 +308,15 @@ export default function Scene({ lang }: { lang: Lang }) {
     <>
       <Starfield flashAt={flashAt} earthSize={earthSize} />
       <div className="sun-glow" aria-hidden="true" />
+      {/* Lens flare — only visible while the sun is crossing zenith.
+          Locked to the same 153s cycle as .sun-glow so the ghosts
+          land right as the backdrop blows out, no JS needed. */}
+      <div className="sun-flare" aria-hidden="true">
+        <span className="sun-flare__spot sun-flare__spot--a" />
+        <span className="sun-flare__spot sun-flare__spot--b" />
+        <span className="sun-flare__spot sun-flare__spot--c" />
+        <span className="sun-flare__streak" />
+      </div>
       <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
           <Earth size={earthSize} ritual={ritual} witnesses={witnesses} />
