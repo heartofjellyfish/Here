@@ -62,10 +62,11 @@ const SUN_CYCLE_MS = 153_000;
 const FLARE_WINDOW_START = 8;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
 // End is pulled in close to the peak: 1% of a 153s cycle ≈ 1.53s, so
-// FLARE_WINDOW_END = 48 gives ~3s of fade past zenith before the
-// flare is fully gone. Tried 47 (~1.5s, felt abrupt) and 49 (~4.6s,
-// felt long); 48 is the sweet spot.
-const FLARE_WINDOW_END = 48;
+// FLARE_WINDOW_END = 50 gives ~6s of fade past zenith. This was
+// tuned up from 47 (felt abrupt) and 48 (still too short); 50 gives
+// the fall time to breathe without the chain overstaying into the
+// sun's descent the way the original 82 did.
+const FLARE_WINDOW_END = 50;
 
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
