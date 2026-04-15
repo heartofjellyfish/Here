@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Earth, { type Ritual, type Witness } from "./Earth";
+import Earth, {
+  type Ritual,
+  type Witness,
+  type WitnessTiming,
+} from "./Earth";
 import Starfield from "./Starfield";
 import SunFlare from "./SunFlare";
 import TapButton from "./TapButton";
@@ -42,8 +46,21 @@ const WITNESS_STAGGER_MS = 4_500;
 // moment don't land on exactly the same client tick.
 const WITNESS_MIN_DELAY_MS = 200;
 const WITNESS_JITTER_MS = 600;
-// How long each bloom lives (total). Must match Earth.tsx.
-const WITNESS_LIFETIME_MS = 27_500;
+
+// Per-bloom lifecycle defaults. Each bloom rises to full brightness,
+// holds, then fades. Overridable via ?rise=&hold=&fade= URL params
+// (values in seconds) — lets us preview "stays lit longer" or "quick
+// glints" without code changes. Defaults match the hand-tuned values
+// the ritual was designed around.
+const DEFAULT_TIMING: WitnessTiming = {
+  riseMs: 1500,
+  holdMs: 6000,
+  fadeMs: 20000,
+};
+
+function lifetimeOf(t: WitnessTiming): number {
+  return t.riseMs + t.holdMs + t.fadeMs;
+}
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -85,17 +102,48 @@ export default function Scene({ lang }: { lang: Lang }) {
   const earthRef = useRef<HTMLDivElement>(null);
   const phraseRef = useRef<HTMLHeadingElement>(null);
   const tapWrapRef = useRef<HTMLDivElement>(null);
-  // Optional `?sim=50` query param. When present, it's forwarded on
-  // every /api/witness poll so the backend generates simulated high-
-  // rate traffic for this session only. Means you can preview the
-  // busy-globe effect with a URL like `/?sim=50` without touching
-  // env vars. Null when not set → no simulator, production behavior.
-  const simQuery = useRef<string | null>(null);
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const s = p.get("sim");
-    if (s && /^\d+$/.test(s)) simQuery.current = s;
-  }, []);
+
+  // URL-driven preview knobs. Parsed once at mount via lazy state init
+  // so there's no hydration flicker and no re-render storm from param
+  // changes (they can't change at runtime anyway — it's URL-on-load).
+  //
+  // Supported params:
+  //   ?sim=N     — pretend N synthetic taps/sec are coming in (0-200)
+  //   ?rise=S    — per-bloom rise seconds
+  //   ?hold=S    — per-bloom hold-at-full seconds
+  //   ?fade=S    — per-bloom fade seconds
+  //
+  // Defaults produce the intended poetic pace for organic traffic.
+  // For busy simulation (sim=50+), try something shorter so the
+  // globe twinkles instead of saturating, e.g. hold=1&fade=3.
+  const [cfg] = useState<{ simQps: string | null; timing: WitnessTiming }>(
+    () => {
+      if (typeof window === "undefined") {
+        return { simQps: null, timing: { ...DEFAULT_TIMING } };
+      }
+      const p = new URLSearchParams(window.location.search);
+      const sim = p.get("sim");
+      const simQps = sim && /^\d+$/.test(sim) ? sim : null;
+      const readSec = (key: string, defMs: number) => {
+        const v = p.get(key);
+        if (v == null) return defMs;
+        const n = parseFloat(v);
+        // Accept 0 (instant) up to 5 min (300s). Anything crazier
+        // is almost certainly a typo and we'd rather ignore it.
+        if (!Number.isFinite(n) || n < 0 || n > 300) return defMs;
+        return Math.round(n * 1000);
+      };
+      return {
+        simQps,
+        timing: {
+          riseMs: readSec("rise", DEFAULT_TIMING.riseMs),
+          holdMs: readSec("hold", DEFAULT_TIMING.holdMs),
+          fadeMs: readSec("fade", DEFAULT_TIMING.fadeMs),
+        },
+      };
+    },
+  );
+  const lifetimeMs = lifetimeOf(cfg.timing);
 
   const copy = COPY[lang];
   const fontClass = langFontClass(lang);
@@ -215,9 +263,7 @@ export default function Scene({ lang }: { lang: Lang }) {
       if (inFlight) return;
       inFlight = true;
       try {
-        const simParam = simQuery.current
-          ? `&sim=${simQuery.current}`
-          : "";
+        const simParam = cfg.simQps ? `&sim=${cfg.simQps}` : "";
         const res = await fetch(
           `/api/witness?since=${serverSince}${simParam}`,
         );
@@ -253,7 +299,7 @@ export default function Scene({ lang }: { lang: Lang }) {
               });
               // Drop anything that's already past its lifetime so the
               // list doesn't grow unbounded on long sessions.
-              const cutoff = Date.now() - WITNESS_LIFETIME_MS;
+              const cutoff = Date.now() - lifetimeMs;
               return next.filter((w) => w.appearAt > cutoff);
             });
           }, delay);
@@ -309,7 +355,7 @@ export default function Scene({ lang }: { lang: Lang }) {
   useEffect(() => {
     if (witnessActiveAt == null) return;
     const id = window.setInterval(() => {
-      const cutoff = Date.now() - WITNESS_LIFETIME_MS;
+      const cutoff = Date.now() - lifetimeMs;
       setWitnesses((prev) =>
         prev.some((w) => w.appearAt <= cutoff)
           ? prev.filter((w) => w.appearAt > cutoff)
@@ -317,7 +363,7 @@ export default function Scene({ lang }: { lang: Lang }) {
       );
     }, 3_000);
     return () => window.clearInterval(id);
-  }, [witnessActiveAt]);
+  }, [witnessActiveAt, lifetimeMs]);
 
   const stagger = phraseIsStaggered(lang);
 
@@ -328,7 +374,12 @@ export default function Scene({ lang }: { lang: Lang }) {
       <SunFlare />
       <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
-          <Earth size={earthSize} ritual={ritual} witnesses={witnesses} />
+          <Earth
+            size={earthSize}
+            ritual={ritual}
+            witnesses={witnesses}
+            witnessTiming={cfg.timing}
+          />
         </div>
 
         <h1

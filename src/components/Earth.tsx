@@ -46,19 +46,30 @@ export interface Witness {
   appearAt: number;
 }
 
-// Witness bloom lifecycle (ms since appearAt). Must stay in sync with
-// WITNESS_LIFETIME_MS in Scene.tsx — Scene uses the total to GC the
-// list. The tail is intentionally long: at ~160s rotation, a light
-// born on the back of the globe has ~20s of fade time to rotate into
-// view, so you don't miss as many as you would with a 5s pop.
-const WITNESS_RISE_MS = 1500;
-const WITNESS_HOLD_MS = 6000;
-const WITNESS_FADE_MS = 20000;
+// Witness bloom lifecycle — defaults shown here; the values that
+// actually drive the render come from the `witnessTiming` prop, so
+// Scene can override them via URL params (?rise=&hold=&fade=).
+// Scene is the source of truth for lifetime (it uses the sum to GC
+// the list); keeping these in sync is the reason timing is threaded
+// as a single object instead of three separate props.
+// The tail is intentionally long by default: at ~160s rotation, a
+// light born on the back of the globe has ~20s of fade to rotate
+// into view, so you don't miss as many as you would with a 5s pop.
+const DEFAULT_WITNESS_RISE_MS = 1500;
+const DEFAULT_WITNESS_HOLD_MS = 6000;
+const DEFAULT_WITNESS_FADE_MS = 20000;
+
+export type WitnessTiming = {
+  riseMs: number;
+  holdMs: number;
+  fadeMs: number;
+};
 
 type Props = {
   size?: number;
   ritual?: Ritual | null;
   witnesses?: ReadonlyArray<Witness>;
+  witnessTiming?: WitnessTiming;
 };
 
 // ------ constants ------
@@ -478,8 +489,18 @@ export default function Earth({
   size = 320,
   ritual = null,
   witnesses,
+  witnessTiming,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Bloom lifecycle. Published to a ref so the per-frame draw loop
+  // picks up new timing without tearing down the canvas effect.
+  const timingRef = useRef<WitnessTiming>({
+    riseMs: DEFAULT_WITNESS_RISE_MS,
+    holdMs: DEFAULT_WITNESS_HOLD_MS,
+    fadeMs: DEFAULT_WITNESS_FADE_MS,
+  });
+  if (witnessTiming) timingRef.current = witnessTiming;
 
   // Rotation is `baseRot(t) + rotOffset`. The ritual temporarily takes
   // over the rotation; on exit we write back to rotOffset so the idle
@@ -885,20 +906,21 @@ export default function Earth({
         const list = witnessesRef.current;
         if (list.length > 0) {
           const posMap = witnessPosRef.current;
-          const WITNESS_TOTAL =
-            WITNESS_RISE_MS + WITNESS_HOLD_MS + WITNESS_FADE_MS;
+          const { riseMs, holdMs, fadeMs } = timingRef.current;
+          const WITNESS_TOTAL = riseMs + holdMs + fadeMs;
           for (const w of list) {
             const age = realNow - w.appearAt;
             if (age < 0 || age > WITNESS_TOTAL) continue;
             // Envelope: rise (linear) → hold → fade (linear-ish).
+            // riseMs or fadeMs can be 0 — guard division.
             let env: number;
-            if (age < WITNESS_RISE_MS) {
-              env = age / WITNESS_RISE_MS;
-            } else if (age < WITNESS_RISE_MS + WITNESS_HOLD_MS) {
+            if (age < riseMs) {
+              env = riseMs > 0 ? age / riseMs : 1;
+            } else if (age < riseMs + holdMs) {
               env = 1;
             } else {
-              const fa = age - WITNESS_RISE_MS - WITNESS_HOLD_MS;
-              env = Math.max(0, 1 - fa / WITNESS_FADE_MS);
+              const fa = age - riseMs - holdMs;
+              env = fadeMs > 0 ? Math.max(0, 1 - fa / fadeMs) : 0;
             }
             if (env <= 0) continue;
 
