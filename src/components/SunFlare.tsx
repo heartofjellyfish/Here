@@ -61,12 +61,11 @@ const SUN_CYCLE_MS = 153_000;
 // which felt like it overstayed.
 const FLARE_WINDOW_START = 8;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
-// End is pinned as close to the peak as the physics allows: 1% of a
-// 153s cycle ≈ 1.53s, so FLARE_WINDOW_END = 47 gives ~1.5s of fade
-// past zenith before the flare is fully gone. Can't go earlier
-// without also shifting the peak off the sun's actual zenith, which
-// would make the flare peak while the sun is still climbing.
-const FLARE_WINDOW_END = 47;
+// End is pulled in close to the peak: 1% of a 153s cycle ≈ 1.53s, so
+// FLARE_WINDOW_END = 48 gives ~3s of fade past zenith before the
+// flare is fully gone. Tried 47 (~1.5s, felt abrupt) and 49 (~4.6s,
+// felt long); 48 is the sweet spot.
+const FLARE_WINDOW_END = 48;
 
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
