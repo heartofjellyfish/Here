@@ -100,15 +100,20 @@ type GhostDef = {
   sizePhase: number;
 };
 
-// Chromatic palette reference (Interstellar / anamorphic flares):
-// real lens coatings reflect specific wavelength bands, so the ghost
-// chain is NEVER monochrome-amber — it's warm hotspots interspersed
-// with cool cyan/blue and deep red artifacts. That chromatic
-// separation is what makes a flare read as "cinematic" instead of
-// "colored decal." The mix below keeps warm tones near the sun-end
-// (they dominate) but drops a cool cyan ghost into the middle and a
-// cold deep-red at the tail — contrast against our warm ambient
-// haze, not harmony with it.
+// Chromatic palette — deliberately restrained.
+//
+// A full Interstellar-style dichroic chain (three saturated rings
+// in amber / cyan / purple) is too showy for this scene: the page
+// is a quiet meditation, the flare is atmosphere, not spectacle.
+// Three ring colors also pulls the eye away from the earth and
+// the phrase — the two things that actually carry the emotion.
+//
+// So the chain keeps just ONE ring (the warm iris artifact, which
+// universally reads as "lens flare") and uses hue variation on
+// the discs to hint at chromatic separation without advertising
+// it. One disc is slightly cool so the chain isn't a single-tone
+// amber stripe, but it stays desaturated enough to feel like
+// internal reflection rather than stained glass.
 const GHOSTS: GhostDef[] = [
   // Bright glint between sun and center — the sharp hot pinpoint
   // every real lens flare has closest to the source. Stays small
@@ -125,26 +130,18 @@ const GHOSTS: GhostDef[] = [
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
   // Large soft disc — the anchor of the chain, warmest mid-amber.
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
-  // COOL CYAN RING — the Interstellar move. A second iris-style
-  // reflection, this one off a blue-coated element. Different
-  // size, color, and axial position from the amber ring above,
-  // so the pair reads as "two different internal surfaces" not
-  // "concentric bullseye." Lower defocusResponse than the amber
-  // ring because it's further from the optical stop.
-  { t: -0.68, size: 6, hue: "150, 205, 240", kind: "ring", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.9, sizePhase: 4.1 },
-  // Amber ghost — soft filled disc providing a warm bed between
-  // the cool cyan ring and the cooler purple ring further out.
+  // Subtly cool disc — the one chromatic break in the chain. Pale
+  // blue-grey, *not* saturated cyan: close enough to white to read
+  // as "that ghost happens to catch light differently" rather than
+  // "that ghost is a colored decal."
+  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
+  // Amber ghost further along the chain.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
-  // PURPLE RING — third and last ring in the chain, deeper in
-  // color and smaller than the cyan one. Three rings work
-  // because each is a different hue and a different size; what
-  // reads as a bullseye is three *identical* concentric rings,
-  // not three distinct ones spread along the axis.
-  { t: -1.15, size: 7, hue: "220, 150, 200", kind: "ring", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 1.0, sizePhase: 5.6 },
-  // Deep red tail — a real flare's far end is often the most
-  // saturated because the long-path reflections accumulate
-  // chromatic shift. Small and sharp again, not diffuse.
-  { t: -1.5, size: 4.5, hue: "255, 120, 90", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
+  // Deepening amber approaching the tail. Warm-only from here so
+  // the chain resolves back to the scene's overall color mood.
+  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
+  // Small warm tail — sharper again at the far end of the chain.
+  { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
 
 // Linearly interpolate sun position from the waypoint table.
