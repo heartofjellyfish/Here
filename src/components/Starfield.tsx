@@ -66,39 +66,81 @@ function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-function generateStars(): Star[] {
-  const main: Star[] = Array.from({ length: STAR_COUNT }, (_, i) => ({
-    id: i,
-    x: rand(0, 100),
-    y: rand(0, 100),
-    size: rand(0.6, 1.9),
-    minOpacity: rand(0.04, 0.11),
-    maxOpacity: rand(0.18, 0.52),
-    twinkleDur: rand(4, 10),
-    delay: rand(0, 8),
-  }));
+/**
+ * Place a star at a random % position that falls *outside* the earth's
+ * visual disk. The earth sits at the viewport center (see .stage in
+ * globals.css), so we reject any candidate whose pixel distance from
+ * center is within `excludePx`. Without this, small stars drifted over
+ * the globe and blurred with the country dots — the sky and the land
+ * stopped reading as separate layers.
+ *
+ * We cap the retry count so this can never spin forever in a pathological
+ * viewport; after giving up we accept the last candidate rather than
+ * dropping the star entirely. Empirically 12 tries is enough at every
+ * size we clamp the earth to.
+ */
+function randPosOutsideEarth(
+  vw: number,
+  vh: number,
+  excludePx: number,
+): { x: number; y: number } {
+  const cx = vw / 2;
+  const cy = vh / 2;
+  const excludeSq = excludePx * excludePx;
+  for (let i = 0; i < 12; i++) {
+    const x = rand(0, 100);
+    const y = rand(0, 100);
+    const dx = (x / 100) * vw - cx;
+    const dy = (y / 100) * vh - cy;
+    if (dx * dx + dy * dy >= excludeSq) return { x, y };
+  }
+  return { x: rand(0, 100), y: rand(0, 100) };
+}
+
+function generateStars(excludePx: number): Star[] {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+  const main: Star[] = Array.from({ length: STAR_COUNT }, (_, i) => {
+    const { x, y } = randPosOutsideEarth(vw, vh, excludePx);
+    return {
+      id: i,
+      x,
+      y,
+      size: rand(0.6, 1.9),
+      minOpacity: rand(0.04, 0.11),
+      maxOpacity: rand(0.18, 0.52),
+      twinkleDur: rand(4, 10),
+      delay: rand(0, 8),
+    };
+  });
   // Sleeping stars: smaller, very faint at rest. The WARM_BOOST lifts
   // them to "barely there" after the tap, and the flash burst catches
   // their inline --star-min/max baseline at peak.
-  const flashers: Star[] = Array.from({ length: FLASH_STAR_COUNT }, (_, i) => ({
-    id: STAR_COUNT + i,
-    x: rand(0, 100),
-    y: rand(0, 100),
-    size: rand(0.4, 1.2),
-    minOpacity: rand(0.003, 0.012),
-    maxOpacity: rand(0.05, 0.14),
-    twinkleDur: rand(5, 11),
-    delay: rand(0, 8),
-  }));
+  const flashers: Star[] = Array.from({ length: FLASH_STAR_COUNT }, (_, i) => {
+    const { x, y } = randPosOutsideEarth(vw, vh, excludePx);
+    return {
+      id: STAR_COUNT + i,
+      x,
+      y,
+      size: rand(0.4, 1.2),
+      minOpacity: rand(0.003, 0.012),
+      maxOpacity: rand(0.05, 0.14),
+      twinkleDur: rand(5, 11),
+      delay: rand(0, 8),
+    };
+  });
   return [...main, ...flashers];
 }
 
 type Props = {
   /** Date.now() timestamp at which the starfield should flash once. */
   flashAt?: number | null;
+  /** Earth diameter in px — used to carve out a star-free disk around
+   *  the globe so small stars don't bleed into the country lights. */
+  earthSize?: number;
 };
 
-export default function Starfield({ flashAt = null }: Props) {
+export default function Starfield({ flashAt = null, earthSize = 340 }: Props) {
   // Generate stars client-side only so SSR markup stays deterministic
   // (no hydration mismatch on Math.random).
   const [stars, setStars] = useState<Star[]>([]);
@@ -111,8 +153,13 @@ export default function Starfield({ flashAt = null }: Props) {
   const nextId = useRef(0);
 
   useEffect(() => {
-    setStars(generateStars());
-  }, []);
+    // Exclude a slightly larger disk than the earth itself: earth
+    // radius + ~28px of visual breathing room. Not so large that the
+    // whole upper-center of the sky goes empty — just enough that the
+    // eye reads "globe, then sky," not a cloud of dots around a globe.
+    const excludePx = earthSize / 2 + 28;
+    setStars(generateStars(excludePx));
+  }, [earthSize]);
 
   useEffect(() => {
     let timeoutId: number;

@@ -147,7 +147,7 @@ export default function Scene({ lang }: { lang: Lang }) {
 
   return (
     <>
-      <Starfield flashAt={flashAt} />
+      <Starfield flashAt={flashAt} earthSize={earthSize} />
       <div className="sun-glow" aria-hidden="true" />
       <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
