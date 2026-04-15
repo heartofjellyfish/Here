@@ -491,48 +491,6 @@ body {
   );
 }
 
-/* Hexagonal ghost — a soft warm disc clipped to a regular hexagon.
-   The polygon shape is the point: real lens-flare ghosts take
-   the shape of the aperture (5/6/7/8 blades).
-
-   IMPORTANT — this must read as a translucent ghost, NOT a
-   sticker:
-   - No bright rim highlight. Rim brightness at the clip edge
-     makes the shape look pasted on rather than light passing
-     through optics.
-   - Peak alpha stays low (~0.4 center). Real hex bokeh is
-     ghostly — you can see what's behind it. High alpha turns
-     it into cardboard.
-   - Gradient still holds color out to the 100% mark so the
-     clip-path has something to cut — otherwise the polygon
-     silhouette disappears entirely — but at such low alpha
-     that the polygon reads as a hint, not a hard shape. */
-.sun-flare__ghost--hex {
-  background: radial-gradient(
-    closest-side,
-    rgba(var(--ghost-hue), 0.42) 0%,
-    rgba(var(--ghost-hue), 0.30) 45%,
-    rgba(var(--ghost-hue), 0.18) 80%,
-    rgba(var(--ghost-hue), 0.12) 100%
-  );
-  /* Flat-top regular hexagon. Vertices at:
-     top edge  (25%,0) → (75%,0)
-     right vtx (100%,50)
-     bottom    (75%,100) → (25%,100)
-     left vtx  (0,50) */
-  clip-path: polygon(
-    25% 0%,
-    75% 0%,
-    100% 50%,
-    75% 100%,
-    25% 100%,
-    0% 50%
-  );
-  /* clip-path overrides border-radius, but stating it documents
-     intent for anyone reading this later. */
-  border-radius: 0;
-}
-
 /* Diffraction starburst — the classic 4-pointed spike pattern a
    bright light source creates when its rays pass through a
    polygonal aperture (you see this on every pointed star in a

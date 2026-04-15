@@ -59,7 +59,7 @@ const SUN_CYCLE_MS = 153_000;
 const FLARE_WINDOW_START = 8;
 const FLARE_WINDOW_END = 82;
 
-type GhostKind = "glint" | "disc" | "ring" | "hex";
+type GhostKind = "glint" | "disc" | "ring";
 type GhostDef = {
   // Axial position along the line from the sun through the lens's
   // optical center (0,0). Negative values live on the opposite side
@@ -135,15 +135,10 @@ const GHOSTS: GhostDef[] = [
   { t: -0.68, size: 6, hue: "205, 220, 235", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
   // Amber ghost further along the chain.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
-  // HEXAGONAL ghost — moved out to a more distant chain
-  // position so (a) it never overlaps the earth, even at
-  // zenith when the chain axis is vertical, and (b) it reads
-  // as an outlier polygon in the tail of the chain rather
-  // than a giant tile pressing against the main subject.
-  // Smaller than before (7vw), low defocusResponse so it
-  // doesn't balloon at zenith, low blur so the six edges
-  // survive.
-  { t: -1.15, size: 7, hue: "220, 195, 160", kind: "hex", blur: 0.6, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.3, sizePhase: 5.6 },
+  // Deepening amber approaching the tail. Warm-only from here
+  // so the chain resolves back to the scene's overall color
+  // mood.
+  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
   // Small warm tail — sharper again at the far end of the chain.
   { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
