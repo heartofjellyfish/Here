@@ -602,24 +602,27 @@ body {
   letter-spacing: 0.14em;
 }
 
-/* Softer vocative on a new line — "my friend." whispered beneath the
-   main acknowledgment. Muted tone so the eye reads it as a quiet rider,
-   not a second statement. */
-.reveal__ack-sub {
-  display: block;
-  margin-top: 6px;
-  font-size: 13px;
+/* The coda arrives after the universe has flashed — the same thought,
+   widened from "you" to "we." Quieter than the ack so the voice feels
+   like it's settling rather than repeating. Comes on its own line
+   underneath, with breathing room above. */
+.reveal__coda {
+  margin: 14px 0 0 0;
+  font-size: 14px;
   font-weight: 400;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-  font-style: italic;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  font-family: var(--font-latin-serif);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 2000ms ease, transform 2000ms ease;
 }
-.font-cjk .reveal__ack-sub {
-  letter-spacing: 0.22em;
-  font-style: normal;
+.font-cjk .reveal__coda {
+  font-family: var(--font-cjk-serif);
+  letter-spacing: 0.18em;
 }
-.font-ar .reveal__ack-sub {
-  font-style: normal;
+.font-ar .reveal__coda {
+  font-family: var(--font-ar-serif);
 }
 
 .reveal__resonance {
@@ -645,19 +648,24 @@ body {
 }
 
 /* Reveal timeline (relative to entering "revealed"):
-     0.0s–1.4s   snap: earth eases to the user's point, ignites it
-     1.4s–2.4s   ignite hold: the +1 has its own beat, alone on the globe
-     2.4s–7.4s   sweep: one slow turn lighting every chorus country
-     7.4s–9.4s   flash: earth holds; the sky blooms for 2 seconds
-     9.4s–10.4s  fade: everything settles back into calm
-     7.6s        ack fades in just as the flash begins, landing as the
-                 peaceful confirmation rather than stealing the moment
-                 from the bloom
+     0.0s–1.4s    snap: earth eases to the user's point, ignites it
+     1.4s–2.4s    ignite hold: the +1 has its own beat, alone on the globe
+     2.4s–7.4s    sweep: one slow turn lighting every chorus country
+     7.4s–9.4s    flash: earth holds; the sky blooms for 2 seconds
+     9.4s–10.4s   fade: everything settles back into calm
+     7.6s         ack ("you're not alone") lands with the flash
+     9.8s         coda ("we're not alone") surfaces once the flash has
+                  passed — the voice widens from singular to collective
 */
 .stage--revealed .reveal__ack {
   opacity: 0.92;
   transform: none;
   transition-delay: 7600ms;
+}
+.stage--revealed .reveal__coda {
+  opacity: 0.78;
+  transform: none;
+  transition-delay: 9800ms;
 }
 .stage--revealed .reveal__resonance {
   opacity: 1;
@@ -703,6 +711,7 @@ body {
     filter: none;
   }
   .stage--revealed .reveal__ack,
+  .stage--revealed .reveal__coda,
   .stage--revealed .reveal__resonance,
   .stage--revealed .reveal__presence {
     opacity: 1;

@@ -18,28 +18,30 @@ export type Lang =
   | "nl"
   | "ar";
 
-// `ack` is a tuple: the main line, and a softer vocative below it — a
-// "you're not alone. my friend." rhythm where the second line lands as
-// a whisper. Second line styled smaller + muted in CSS.
+// `ack` lands first — the direct reassurance to the person tapping.
+// `coda` arrives later, after the universe has flashed and settled:
+// the same thought widened from "you" to "we," so the final word in
+// the view is collective. Two voices, one idea, spaced in time.
 export const COPY: Record<
   Lang,
   {
     phrase: string;
-    ack: readonly [string, string];
+    ack: string;
+    coda: string;
   }
 > = {
-  zh: { phrase: "我累了", ack: ["你不是一个人。", "朋友。"] },
-  en: { phrase: "I'm tired.", ack: ["You're not alone.", "my friend."] },
-  ja: { phrase: "疲れた。", ack: ["ひとりじゃない。", "友よ。"] },
-  ko: { phrase: "지쳤어.", ack: ["혼자가 아니에요.", "친구야."] },
-  es: { phrase: "Estoy cansado.", ack: ["No estás solo.", "amigo."] },
-  fr: { phrase: "Je suis fatigué.", ack: ["Tu n'es pas seul.", "mon ami."] },
-  de: { phrase: "Ich bin müde.", ack: ["Du bist nicht allein.", "mein Freund."] },
-  pt: { phrase: "Estou cansado.", ack: ["Você não está sozinho.", "meu amigo."] },
-  ru: { phrase: "Я устал.", ack: ["Ты не один.", "друг."] },
-  it: { phrase: "Sono stanco.", ack: ["Non sei solo.", "amico mio."] },
-  nl: { phrase: "Ik ben moe.", ack: ["Je bent niet alleen.", "vriend."] },
-  ar: { phrase: "أنا متعب.", ack: ["لست وحدك.", "يا صديقي."] },
+  zh: { phrase: "我累了", ack: "你不是一个人。", coda: "我们都不是一个人。" },
+  en: { phrase: "I'm tired.", ack: "You're not alone.", coda: "We're not alone." },
+  ja: { phrase: "疲れた。", ack: "ひとりじゃない。", coda: "私たちはひとりじゃない。" },
+  ko: { phrase: "지쳤어.", ack: "혼자가 아니에요.", coda: "우리는 혼자가 아니에요." },
+  es: { phrase: "Estoy cansado.", ack: "No estás solo.", coda: "No estamos solos." },
+  fr: { phrase: "Je suis fatigué.", ack: "Tu n'es pas seul.", coda: "Nous ne sommes pas seuls." },
+  de: { phrase: "Ich bin müde.", ack: "Du bist nicht allein.", coda: "Wir sind nicht allein." },
+  pt: { phrase: "Estou cansado.", ack: "Você não está sozinho.", coda: "Não estamos sozinhos." },
+  ru: { phrase: "Я устал.", ack: "Ты не один.", coda: "Мы не одни." },
+  it: { phrase: "Sono stanco.", ack: "Non sei solo.", coda: "Non siamo soli." },
+  nl: { phrase: "Ik ben moe.", ack: "Je bent niet alleen.", coda: "We zijn niet alleen." },
+  ar: { phrase: "أنا متعب.", ack: "لست وحدك.", coda: "لسنا وحدنا." },
 };
 
 // Accept-Language primary → Lang.

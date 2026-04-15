@@ -188,10 +188,8 @@ export default function Scene({ lang }: { lang: Lang }) {
         </div>
 
         <div className="reveal" role="status" aria-live="polite">
-          <p className="reveal__ack">
-            {copy.ack[0]}
-            <span className="reveal__ack-sub">{copy.ack[1]}</span>
-          </p>
+          <p className="reveal__ack">{copy.ack}</p>
+          <p className="reveal__coda">{copy.coda}</p>
         </div>
       </main>
       <Grain />
