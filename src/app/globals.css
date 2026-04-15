@@ -594,27 +594,59 @@ body {
       transparent 2deg,
       transparent 23deg
     );
+  /* Directional mask: the bright zone is offset to +x (90% 50%), so
+     only rays on the "forward" side of the element are visible.
+     JS rotates the element so its local +x points FROM the sun INTO
+     the scene (toward the viewport origin), turning the rays from a
+     360° pinwheel into a cone of shafts fanning forward — which is
+     how god rays actually read when the light source is in frame. */
   -webkit-mask: radial-gradient(
-    closest-side,
-    transparent 0%,
-    transparent 6%,
-    rgba(0, 0, 0, 0.4) 12%,
-    black 22%,
-    black 40%,
-    rgba(0, 0, 0, 0.5) 60%,
-    transparent 82%
+    ellipse 65% 50% at 90% 50%,
+    black 10%,
+    black 45%,
+    rgba(0, 0, 0, 0.35) 70%,
+    transparent 92%
   );
   mask: radial-gradient(
-    closest-side,
-    transparent 0%,
-    transparent 6%,
-    rgba(0, 0, 0, 0.4) 12%,
-    black 22%,
-    black 40%,
-    rgba(0, 0, 0, 0.5) 60%,
-    transparent 82%
+    ellipse 65% 50% at 90% 50%,
+    black 10%,
+    black 45%,
+    rgba(0, 0, 0, 0.35) 70%,
+    transparent 92%
   );
   filter: blur(1.8px);
+}
+
+/* Optical axis streak — a soft glowing trace along the line from
+   the sun, through the viewport center, out past the last ghost in
+   the chain. Without this, the sun-to-chain relationship is hard to
+   read (each ghost fades in quietly with nothing visibly connecting
+   them); with it, the whole chain is obviously on one axis.
+   Anchored at its left edge (transform-origin 0% 50%) so JS can
+   place that edge AT the sun and rotate it to point through the
+   chain. Gradient fades from warm at the sun end to transparent
+   past the tail. Kept soft with a heavy blur — it's atmosphere, not
+   a laser. */
+.sun-flare__axis {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 180vw;
+  height: 2.5vh;
+  transform-origin: 0% 50%;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  background: linear-gradient(
+    to right,
+    rgba(255, 238, 205, 0.4) 0%,
+    rgba(255, 235, 195, 0.22) 8%,
+    rgba(255, 230, 180, 0.14) 22%,
+    rgba(255, 225, 170, 0.07) 42%,
+    rgba(255, 222, 165, 0.03) 68%,
+    transparent 90%
+  );
+  filter: blur(3.5px);
 }
 
 .sun-flare__starburst {

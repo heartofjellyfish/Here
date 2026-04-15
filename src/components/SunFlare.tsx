@@ -194,6 +194,7 @@ export default function SunFlare() {
   const ghostRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starburstRef = useRef<HTMLDivElement | null>(null);
   const godRaysRef = useRef<HTMLDivElement | null>(null);
+  const axisRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -295,6 +296,23 @@ export default function SunFlare() {
       // than just two ghosts are ever visible simultaneously.
       const globalAlpha = envelope;
 
+      // True perpendicular to the optical axis, derived from the
+      // current sun direction. Previously perpOffset was applied as
+      // a fixed (+x, 0.4*+y) shift — not actually perpendicular —
+      // so as the sun swung from lower-left up to zenith and over
+      // to upper-right, the chain's sideways jitter stayed locked
+      // to screen-x. That broke the "all ghosts lie on the same
+      // ray from the sun" read: the chain appeared to drift off the
+      // sun's axis. Now the jitter is always perpendicular to the
+      // current axis, so the chain stays visually tethered to the
+      // sun no matter where the sun is.
+      const sunLen = Math.hypot(rawSx, rawSy);
+      const axisUnitX = sunLen > 0.01 ? rawSx / sunLen : 1;
+      const axisUnitY = sunLen > 0.01 ? rawSy / sunLen : 0;
+      // Rotate 90° to get perpendicular direction.
+      const perpUnitX = -axisUnitY;
+      const perpUnitY = axisUnitX;
+
       for (let i = 0; i < GHOSTS.length; i++) {
         const g = GHOSTS[i];
         const el = ghostRefs.current[i];
@@ -305,8 +323,11 @@ export default function SunFlare() {
         // expands to camCoord · (1 - t) + t · sunCoord — meaning
         // far-from-center ghosts parallax *more* than near ones,
         // which is exactly what real off-axis elements do.
-        const gx = camX * (1 - g.t) + g.t * rawSx + g.perpOffset;
-        const gy = camY * (1 - g.t) + g.t * rawSy + g.perpOffset * 0.4;
+        // perpOffset is applied along the true perpendicular to the
+        // axis (see sunLen / perpUnit calc above) so the chain stays
+        // on-axis as the sun moves.
+        const gx = camX * (1 - g.t) + g.t * rawSx + g.perpOffset * perpUnitX;
+        const gy = camY * (1 - g.t) + g.t * rawSy + g.perpOffset * perpUnitY;
 
         // Size driven by two independent sources so the chain
         // doesn't inflate in lockstep:
@@ -409,15 +430,50 @@ export default function SunFlare() {
         }
         // Alpha capped deliberately low so the page stays readable.
         const rayAlpha = rayEnv * 0.35;
-        // Very slow rotation — one full rev every ~6 minutes.
-        // Rays need to feel alive without drawing the eye.
-        const rayRot = (now * 0.0015) % 360;
-        // Centered on the sun's screen position (raw, not drifted).
+        // Orient the rays directionally instead of as a symmetric
+        // pinwheel: CSS mask carves a "visible cone" on the +x side
+        // of the element, so by rotating the element so its local +x
+        // points FROM the sun TOWARD the origin (into the scene),
+        // the rays read as sunlight shafting *forward* through air,
+        // not a hub of spokes around the sun.
+        // Small sinusoidal wobble on top for a whisper of liveness
+        // without re-introducing the pinwheel rotation.
+        const sunDistForRays = Math.hypot(rawSx, rawSy);
+        const forwardDeg =
+          sunDistForRays > 0.01
+            ? (Math.atan2(rawSy, rawSx) * 180) / Math.PI + 180
+            : 0;
+        const rayRot = forwardDeg + 4 * Math.sin(now * 0.0008);
         godRaysRef.current.style.transform =
           `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
           `translate(-50%, -50%) ` +
           `rotate(${rayRot.toFixed(2)}deg)`;
         godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
+      }
+
+      // Optical axis streak — a soft glowing line that traces the
+      // axis from the sun THROUGH the viewport center and out past
+      // the ghost chain. Without it, the geometric relationship
+      // between the sun's position and the ghost chain is hard to
+      // read on the rise (each ghost fades in quietly and there's
+      // nothing visibly connecting them to the sun). With it, the
+      // whole chain reads as "one axis, many artifacts along it."
+      if (axisRef.current) {
+        const axisAlpha = envelope * 0.42;
+        const sunDistForAxis = Math.hypot(rawSx, rawSy);
+        // Orient from the sun AWAY from the origin — the element is
+        // anchored at its left edge (transform-origin 0% 50%), so
+        // rotating it by (sun→origin direction + 180°) sends its
+        // tail past the origin and through the ghost chain.
+        const axisDeg =
+          sunDistForAxis > 0.01
+            ? (Math.atan2(rawSy, rawSx) * 180) / Math.PI + 180
+            : 0;
+        axisRef.current.style.transform =
+          `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
+          `translate(0, -50%) ` +
+          `rotate(${axisDeg.toFixed(2)}deg)`;
+        axisRef.current.style.opacity = Math.max(0, Math.min(1, axisAlpha)).toFixed(3);
       }
 
       raf = requestAnimationFrame(tick);
@@ -430,6 +486,7 @@ export default function SunFlare() {
   return (
     <div className="sun-flare" aria-hidden="true">
       <div ref={godRaysRef} className="sun-flare__rays" />
+      <div ref={axisRef} className="sun-flare__axis" />
       <div ref={starburstRef} className="sun-flare__starburst" />
       {GHOSTS.map((g, i) => (
         <div
