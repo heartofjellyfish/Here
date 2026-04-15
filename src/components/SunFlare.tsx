@@ -129,14 +129,15 @@ const GHOSTS: GhostDef[] = [
   // Large soft disc — the anchor of the chain, warmest mid-amber.
   { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
   // HEXAGONAL ghost — the one that actually reveals the lens's
-  // aperture shape. Real lens-flare ghosts are reflections off
-  // the polygonal iris blades, so their outline follows that
-  // polygon; we render most ghosts as circles because heavy
-  // defocus smears them, but one sharper-than-average hex in
-  // the chain is the detail that sells "these are lens optics,
-  // not colored blobs." Subtly cool-tinted so it also carries
-  // the chromatic-separation role.
-  { t: -0.68, size: 6, hue: "205, 220, 235", kind: "hex", blur: 1.4, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
+  // aperture shape. For the polygon silhouette to *read* as a
+  // hexagon it has to be bigger, sharper, and more opaque at
+  // the edges than a normal disc — otherwise the clip-path cuts
+  // at a region that's already faded to transparent and the
+  // hex reads as a circle. Low blur (0.5px) so the six straight
+  // edges survive; gradient holds color all the way to the rim.
+  // Subtly cool-tinted so it also carries the chromatic-
+  // separation role.
+  { t: -0.68, size: 10, hue: "205, 220, 235", kind: "hex", blur: 0.5, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.6, sizePhase: 4.1 },
   // Amber ghost further along the chain.
   { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
   // Deepening amber approaching the tail. Warm-only from here so

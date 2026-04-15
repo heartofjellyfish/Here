@@ -492,23 +492,32 @@ body {
 }
 
 /* Hexagonal ghost — a soft warm disc clipped to a regular hexagon.
-   The polygon shape is the point: real lens-flare ghosts take the
-   shape of the aperture (5/6/7/8 blades), and rendering even one
-   hex in the chain is what flips the whole thing from "colored
-   discs" into "camera optics." Flat-top hexagon because that's the
-   canonical photographic aperture orientation. Lower blur than
-   surrounding discs so the polygon silhouette survives. */
+   The polygon shape is the point: real lens-flare ghosts take
+   the shape of the aperture (5/6/7/8 blades), and rendering even
+   one hex in the chain is what flips the whole thing from
+   "colored discs" into "camera optics."
+
+   Critical subtlety: the radial gradient must NOT fade to
+   transparent before reaching the polygon edge, or the clip-
+   path has nothing to cut — you get a soft circle regardless
+   of the hex outline. We hold color out to 100% and let the
+   clip-path provide the hard edge. A brighter stop right at
+   the rim (0.55 alpha) gives the silhouette a faint "aperture
+   blade" highlight where it's cut. */
 .sun-flare__ghost--hex {
   background: radial-gradient(
     closest-side,
-    rgba(var(--ghost-hue), 0.7) 0%,
-    rgba(var(--ghost-hue), 0.45) 35%,
-    rgba(var(--ghost-hue), 0.22) 65%,
-    rgba(var(--ghost-hue), 0.08) 85%,
-    transparent 100%
+    rgba(var(--ghost-hue), 0.85) 0%,
+    rgba(var(--ghost-hue), 0.68) 40%,
+    rgba(var(--ghost-hue), 0.52) 72%,
+    rgba(var(--ghost-hue), 0.48) 92%,
+    rgba(var(--ghost-hue), 0.55) 100%
   );
-  /* Flat-top regular hexagon. Inner circle radius 50% → vertices
-     at ±43.3% on Y axis (cos 30° × 50%), ±50% on X axis. */
+  /* Flat-top regular hexagon. Vertices at:
+     top edge  (25%,0) → (75%,0)
+     right vtx (100%,50)
+     bottom    (75%,100) → (25%,100)
+     left vtx  (0,50) */
   clip-path: polygon(
     25% 0%,
     75% 0%,
@@ -517,8 +526,8 @@ body {
     25% 100%,
     0% 50%
   );
-  /* No border-radius here — the hex clip-path would override it
-     anyway, but making it explicit documents intent. */
+  /* clip-path overrides border-radius, but stating it documents
+     intent for anyone reading this later. */
   border-radius: 0;
 }
 
