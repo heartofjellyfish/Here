@@ -435,9 +435,10 @@ body {
   top: 50%;
   left: 50%;
   border-radius: 50%;
-  /* Slight blur softens the gradient stops so the ghosts read as
-     out-of-focus internal reflections rather than sharp circles. */
-  filter: blur(2px);
+  /* Per-ghost blur via --ghost-blur inline; small default for safety.
+     Softens gradient stops so ghosts read as out-of-focus internal
+     reflections rather than sharp circles. */
+  filter: blur(var(--ghost-blur, 2px));
   opacity: 0;
   /* Opacity and transform are driven from JS each frame — hinting
      them to the compositor avoids layout thrash on style writes. */
@@ -458,20 +459,62 @@ body {
 }
 
 /* Aperture-iris ring — a donut-shaped reflection off the stopped-
-   down aperture. Transparent center, warm ring band peaking
-   around 60% of the radius, soft outer falloff. Gives the chain
-   visual variety beyond just filled discs. */
+   down aperture. Faintly filled center (so it doesn't read as a
+   hollow hole), warm ring band peaking around 60% of the radius,
+   soft outer falloff. Only one of these exists in the chain; more
+   than one starts to look like a bullseye target. */
 .sun-flare__ghost--ring {
   background: radial-gradient(
     closest-side,
-    transparent 25%,
-    rgba(var(--ghost-hue), 0.06) 42%,
+    rgba(var(--ghost-hue), 0.1) 25%,
+    rgba(var(--ghost-hue), 0.12) 42%,
     rgba(var(--ghost-hue), 0.3) 55%,
     rgba(var(--ghost-hue), 0.46) 62%,
     rgba(var(--ghost-hue), 0.24) 72%,
     rgba(var(--ghost-hue), 0.07) 85%,
     transparent 95%
   );
+}
+
+/* Sharp hot glint — the tiny bright pinpoint close to the sun
+   itself, the brightest point in any real lens flare. Near-white
+   core with a quick falloff; much less blur than the other ghosts
+   so it reads as a crisp highlight rather than a soft bokeh. */
+.sun-flare__ghost--glint {
+  background: radial-gradient(
+    closest-side,
+    rgba(var(--ghost-hue), 1) 0%,
+    rgba(var(--ghost-hue), 0.85) 20%,
+    rgba(var(--ghost-hue), 0.45) 45%,
+    rgba(var(--ghost-hue), 0.15) 70%,
+    transparent 95%
+  );
+}
+
+/* Anamorphic streak — a wide horizontal smear through the optical
+   center, the signature "J.J. Abrams" artifact of a sun hitting an
+   anamorphic lens element. Kept very thin vertically and wide
+   horizontally, soft warm gradient fading to transparent at the
+   edges. Opacity and horizontal scale are driven from JS each
+   frame (see SunFlare.tsx). */
+.sun-flare__streak {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180vw;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 236, 190, 0.9) 0%,
+    rgba(255, 214, 150, 0.55) 18%,
+    rgba(255, 190, 120, 0.22) 40%,
+    rgba(255, 170, 100, 0.06) 68%,
+    transparent 92%
+  );
+  filter: blur(3px);
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 /* ---------- Film grain ----------
