@@ -445,35 +445,87 @@ body {
   will-change: transform, opacity;
 }
 
-/* Soft disc — an out-of-focus bokeh ghost, the most common kind. A
-   warm center falling through mid tones to a faint outer haze. */
+/* Hex aperture silhouette — applied to iris-reflection ghosts
+   (disc, ring, anchor). Flat-top hex inscribed in the square box
+   with vertices at the top/bottom midpoints and the four "25%/75%"
+   side points. The filter-blur on the ghost softens the hex edge
+   after clipping, so it reads as an out-of-focus aperture rather
+   than a razor-cut shape.
+   Glints are NOT hex — they're pinpoint highlights near the source,
+   not aperture reflections, and stay round the way a real flare's
+   near-sun hot spot does. */
+.sun-flare__ghost--disc,
+.sun-flare__ghost--ring,
+.sun-flare__ghost--anchor {
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+/* Soft disc — an out-of-focus bokeh ghost, the most common kind.
+   Uses farthest-corner so the gradient fills out to the hex
+   corners (at ~0.79 of box-diagonal from center) before fading,
+   instead of fading mid-hex the way closest-side would. Color is
+   held high across the interior because clip-path is what defines
+   the outline; the gradient just shades the fill. */
 .sun-flare__ghost--disc {
   background: radial-gradient(
-    closest-side,
-    rgba(var(--ghost-hue), 0.78) 0%,
-    rgba(var(--ghost-hue), 0.52) 25%,
-    rgba(var(--ghost-hue), 0.24) 50%,
-    rgba(var(--ghost-hue), 0.08) 75%,
-    transparent 95%
+    farthest-corner,
+    rgba(var(--ghost-hue), 0.72) 0%,
+    rgba(var(--ghost-hue), 0.58) 30%,
+    rgba(var(--ghost-hue), 0.42) 55%,
+    rgba(var(--ghost-hue), 0.28) 75%,
+    rgba(var(--ghost-hue), 0.12) 95%,
+    transparent 100%
   );
 }
 
-/* Aperture-iris ring — a donut-shaped reflection off the stopped-
-   down aperture. Faintly filled center (so it doesn't read as a
-   hollow hole), warm ring band peaking around 60% of the radius,
-   soft outer falloff. Only one of these exists in the chain; more
-   than one starts to look like a bullseye target. */
+/* Aperture-iris ring — donut reflection off the stopped-down
+   aperture. With hex clip-path, this reads as a hexagonal ring
+   rather than a perfect circle — the aperture's own polygonal
+   outline impressed onto the reflection.
+   Faint center so it doesn't read as a hollow hole, warm ring
+   band peaking around 60% of the radius, soft outer falloff. */
 .sun-flare__ghost--ring {
   background: radial-gradient(
-    closest-side,
-    rgba(var(--ghost-hue), 0.1) 25%,
-    rgba(var(--ghost-hue), 0.12) 42%,
-    rgba(var(--ghost-hue), 0.3) 55%,
-    rgba(var(--ghost-hue), 0.46) 62%,
-    rgba(var(--ghost-hue), 0.24) 72%,
-    rgba(var(--ghost-hue), 0.07) 85%,
-    transparent 95%
+    farthest-corner,
+    rgba(var(--ghost-hue), 0.08) 20%,
+    rgba(var(--ghost-hue), 0.12) 38%,
+    rgba(var(--ghost-hue), 0.32) 50%,
+    rgba(var(--ghost-hue), 0.48) 58%,
+    rgba(var(--ghost-hue), 0.3) 70%,
+    rgba(var(--ghost-hue), 0.1) 85%,
+    transparent 100%
   );
+}
+
+/* Anchor — the chain's biggest ghost, with rim + core depth.
+   Two stacked gradients:
+     1. Top layer: a rim — transparent center, bright band near the
+        hex edge, fading beyond. Creates the "iris blade" look where
+        you can see the aperture outline glowing.
+     2. Bottom layer: a soft diffuse core that fills in the middle
+        so the ghost doesn't read as a hollow ring. Dimmer than the
+        rim so the rim stays the dominant feature.
+   Together they give the Interstellar signature: a hex ghost with
+   visible depth, not a flat painted disc. */
+.sun-flare__ghost--anchor {
+  background:
+    radial-gradient(
+      farthest-corner,
+      transparent 20%,
+      rgba(var(--ghost-hue), 0.14) 38%,
+      rgba(var(--ghost-hue), 0.42) 58%,
+      rgba(var(--ghost-hue), 0.55) 72%,
+      rgba(var(--ghost-hue), 0.28) 88%,
+      transparent 100%
+    ),
+    radial-gradient(
+      farthest-corner,
+      rgba(var(--ghost-hue), 0.32) 0%,
+      rgba(var(--ghost-hue), 0.2) 35%,
+      rgba(var(--ghost-hue), 0.08) 65%,
+      transparent 90%
+    );
 }
 
 /* Sharp hot glint — the tiny bright pinpoint close to the sun

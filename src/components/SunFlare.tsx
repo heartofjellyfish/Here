@@ -54,12 +54,21 @@ const SUN_CYCLE_MS = 153_000;
 // ---- Flare active window ----
 // Outside this range the sun is either below the horizon or so far
 // off-axis that a lens would produce no meaningful artifacts. The
-// envelope function rises and falls smoothly inside the window so
-// the flare emerges and dissipates rather than snapping on/off.
+// envelope is asymmetric — slow rise, fast fall — so the flare
+// builds as the sun climbs, peaks at zenith, and clears out of
+// the way once the sun is past its high point. A symmetric
+// envelope kept the flare lingering well into the sun's descent,
+// which felt like it overstayed.
 const FLARE_WINDOW_START = 8;
-const FLARE_WINDOW_END = 82;
+const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
+// End is pinned as close to the peak as the physics allows: 1% of a
+// 153s cycle ≈ 1.53s, so FLARE_WINDOW_END = 47 gives ~1.5s of fade
+// past zenith before the flare is fully gone. Can't go earlier
+// without also shifting the peak off the sun's actual zenith, which
+// would make the flare peak while the sun is still climbing.
+const FLARE_WINDOW_END = 47;
 
-type GhostKind = "glint" | "disc" | "ring";
+type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
   // Axial position along the line from the sun through the lens's
   // optical center (0,0). Negative values live on the opposite side
@@ -126,8 +135,13 @@ const GHOSTS: GhostDef[] = [
   // visibly pulses between tight and wide as the sun's off-axis
   // angle changes.
   { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
-  // Large soft disc — the anchor of the chain, warmest mid-amber.
-  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
+  // The anchor — the biggest ghost in the chain, rendered as a
+  // hex with rim+core structure (bright iris band around a softer
+  // core). This is the Interstellar "signature" ghost: you can see
+  // the aperture blades because the reflection formed close to the
+  // stopped-down iris, and it shows depth rather than reading as a
+  // solid disc.
+  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "anchor", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
   // Subtly cool disc sitting where the hex used to be. The
   // chromatic-separation job it was doing still needs doing —
   // one cool patch breaks up the otherwise all-amber chain —
@@ -177,15 +191,26 @@ export default function SunFlare() {
       const now = performance.now();
       const cyclePct = ((now % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
 
-      // Envelope: zero outside the window, sin-bell inside. Peaks
-      // at the window midpoint (≈45%), which is very close to the
-      // sun's zenith at 46%.
+      // Envelope: zero outside the window, two quarter-sines joined
+      // at the peak so the curve rises slowly from START→PEAK and
+      // falls faster from PEAK→END. Peak is pinned to the sun's
+      // zenith (46%), not the window midpoint — a symmetric bell
+      // would peak at (8+62)/2 = 35, i.e. before zenith, which looks
+      // wrong. Asymmetry also lets the flare clear out once the sun
+      // is past its high point instead of lingering through descent.
       let envelope = 0;
       if (cyclePct >= FLARE_WINDOW_START && cyclePct <= FLARE_WINDOW_END) {
-        const u =
-          (cyclePct - FLARE_WINDOW_START) /
-          (FLARE_WINDOW_END - FLARE_WINDOW_START);
-        envelope = Math.sin(u * Math.PI);
+        if (cyclePct < FLARE_WINDOW_PEAK) {
+          const u =
+            (cyclePct - FLARE_WINDOW_START) /
+            (FLARE_WINDOW_PEAK - FLARE_WINDOW_START);
+          envelope = Math.sin((u * Math.PI) / 2);
+        } else {
+          const u =
+            (cyclePct - FLARE_WINDOW_PEAK) /
+            (FLARE_WINDOW_END - FLARE_WINDOW_PEAK);
+          envelope = Math.cos((u * Math.PI) / 2);
+        }
       }
 
       // --- Camera drift ---
