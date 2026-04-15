@@ -475,39 +475,47 @@ body {
   );
 }
 
-/* Anchor — the chain's biggest ghost, as a HOLLOW DONUT. The
-   Interstellar reference is unambiguous: at size, the big ghost is
-   not a filled disc — it's a dark-centered ring with a luminous
-   rim and a faint cool chromatic edge. Two stacked gradients, no
-   core fill:
-     1. Top layer: warm rim — transparent center all the way out to
-        ~45%, then a bright band peaking around 66%, then soft fade.
-        The wide transparent center is what makes it read as hollow
-        when the ghost swells at zenith.
-     2. Bottom layer: a cool blue chromatic echo just outside the
-        warm rim — the lens's dispersion signature, low alpha so it
-        reads as a hint of fringing rather than a second ring.
-   No filled core: we rely on the near-sun glint and the mid-chain
-   discs to carry warmth. The anchor's job is silhouette. */
+/* Anchor — the chain's biggest ghost. The Interstellar reference
+   shows a big hollow-donut silhouette, but that shot is on a black
+   space background where screen blend hides everything dark. On our
+   warm tan background, a truly hollow rim reads as a punched "hole"
+   in the light field because the transparent center adds no light
+   via screen blend while the rim brightens around it. So: mostly
+   donut, with a faint core fill.
+   Three stacked gradients:
+     1. Warm rim — bright band peaking around 68%, softened so the
+        edge dissolves into halo rather than reading as a drawn ring.
+     2. Cool blue chromatic echo just outside the warm rim — the
+        lens's dispersion signature.
+     3. Very soft warm core fill — low enough alpha that the rim
+        still dominates (so the donut shape reads at peak), but
+        high enough that the center never looks empty post-peak. */
 .sun-flare__ghost--anchor {
   background:
     radial-gradient(
       closest-side,
       transparent 0%,
-      transparent 42%,
-      rgba(var(--ghost-hue), 0.16) 52%,
-      rgba(var(--ghost-hue), 0.42) 62%,
-      rgba(var(--ghost-hue), 0.5) 68%,
-      rgba(var(--ghost-hue), 0.22) 80%,
-      transparent 94%
+      transparent 40%,
+      rgba(var(--ghost-hue), 0.12) 52%,
+      rgba(var(--ghost-hue), 0.3) 62%,
+      rgba(var(--ghost-hue), 0.36) 70%,
+      rgba(var(--ghost-hue), 0.16) 82%,
+      transparent 95%
     ),
     radial-gradient(
       closest-side,
       transparent 0%,
       transparent 55%,
-      rgba(180, 200, 230, 0.18) 72%,
-      rgba(180, 200, 230, 0.1) 82%,
+      rgba(180, 200, 230, 0.14) 72%,
+      rgba(180, 200, 230, 0.07) 82%,
       transparent 95%
+    ),
+    radial-gradient(
+      closest-side,
+      rgba(var(--ghost-hue), 0.14) 0%,
+      rgba(var(--ghost-hue), 0.1) 35%,
+      rgba(var(--ghost-hue), 0.05) 60%,
+      transparent 85%
     );
 }
 

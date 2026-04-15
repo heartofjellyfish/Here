@@ -61,13 +61,13 @@ const SUN_CYCLE_MS = 153_000;
 // which felt like it overstayed.
 const FLARE_WINDOW_START = 9;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
-// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 59 → 13% past peak
-// → ~19.9s fade past zenith. The shape of the fade (see the
+// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 60.4 → 14.4% past
+// peak → ~22s fade past zenith. The shape of the fade (see the
 // envelope calc below) drops quickly at first then settles into a
 // long slow tail, so "mostly gone" happens around half the window
 // and "completely gone" only at the very end — reads as the flare
 // losing energy gradually rather than snapping off.
-const FLARE_WINDOW_END = 59;
+const FLARE_WINDOW_END = 60.4;
 
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
