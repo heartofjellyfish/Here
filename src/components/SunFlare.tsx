@@ -87,29 +87,44 @@ type GhostDef = {
   // Small perpendicular nudge off the strict axis (in vw), so the
   // chain doesn't look like a ruler-straight line of beads.
   perpOffset: number;
+  // How strongly this ghost's size responds to the sun being near
+  // the optical axis. Rings swell dramatically when the sun nears
+  // center (the signature "iris bloom" of a real lens flare); a
+  // big already-huge anchor disc should grow *less* so the whole
+  // chain doesn't collapse into one amorphous blob at zenith.
+  // Unitless multiplier on the defocus value.
+  defocusResponse: number;
+  // Independent phase for size pulsing. Separate from alphaPhase
+  // so each ghost breathes its own rhythm in both brightness AND
+  // size, rather than the whole chain inflating in lockstep.
+  sizePhase: number;
 };
 
 const GHOSTS: GhostDef[] = [
   // Bright glint between sun and center — the sharp hot pinpoint
-  // every real lens flare has closest to the source.
-  { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0.0 },
+  // every real lens flare has closest to the source. Stays small
+  // and crisp: a real highlight doesn't bloom.
+  { t: 0.22, size: 2, hue: "255, 253, 240", kind: "glint", blur: 0.6, alphaPhase: 0.0, perpOffset: 0.0, defocusResponse: 0.25, sizePhase: 0.2 },
   // Small pale disc just past the optical center.
-  { t: -0.1, size: 4, hue: "255, 248, 220", kind: "disc", blur: 1.2, alphaPhase: 0.8, perpOffset: 0.3 },
+  { t: -0.1, size: 4, hue: "255, 248, 220", kind: "disc", blur: 1.2, alphaPhase: 0.8, perpOffset: 0.3, defocusResponse: 0.55, sizePhase: 1.1 },
   // The *one* aperture-iris ring — this is the signature
   // donut-shaped artifact that reads as "real lens flare" at a
-  // glance. Kept alone because multiple concentric rings on one
-  // axis looks like a bullseye target, not optics.
-  { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7 },
+  // glance. Highest defocusResponse: a real iris ring *visibly*
+  // pulses between tight and wide as the sun's off-axis angle
+  // changes — that's what "光圈大小应该变" means.
+  { t: -0.3, size: 7, hue: "255, 230, 180", kind: "ring", blur: 1.8, alphaPhase: 1.6, perpOffset: -0.7, defocusResponse: 1.4, sizePhase: 2.0 },
   // Large soft disc — the anchor of the chain, warmest mid-amber.
-  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5 },
+  // Low defocusResponse: it's already 13vw, any further bloom
+  // just eats the screen and turns the whole chain into one blob.
+  { t: -0.5, size: 13, hue: "255, 215, 155", kind: "disc", blur: 3.2, alphaPhase: 2.4, perpOffset: 0.5, defocusResponse: 0.2, sizePhase: 3.3 },
   // Disc overlapping the anchor — dense warm cluster.
-  { t: -0.68, size: 6, hue: "255, 202, 140", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4 },
+  { t: -0.68, size: 6, hue: "255, 202, 140", kind: "disc", blur: 1.8, alphaPhase: 3.3, perpOffset: -0.4, defocusResponse: 0.8, sizePhase: 4.1 },
   // Deeper amber ghost, further along the chain.
-  { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1 },
+  { t: -0.9, size: 9, hue: "255, 188, 122", kind: "disc", blur: 2.6, alphaPhase: 4.5, perpOffset: 1.1, defocusResponse: 0.35, sizePhase: 0.7 },
   // Warm ghost approaching the tail.
-  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9 },
+  { t: -1.15, size: 7, hue: "255, 172, 108", kind: "disc", blur: 2.0, alphaPhase: 5.4, perpOffset: -0.9, defocusResponse: 0.9, sizePhase: 5.6 },
   // Smallest and most orange — tail of the chain, sharper again.
-  { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6 },
+  { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0.6, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
 
 // Linearly interpolate sun position from the waypoint table.
@@ -163,7 +178,9 @@ export default function SunFlare() {
 
       // Defocus growth: when the sun is near the optical axis, each
       // ghost's reflection is near its own focal point and blooms
-      // larger. Subtle effect — up to ~45% size increase at center.
+      // larger. Raw 0→1 value that each ghost modulates by its own
+      // defocusResponse — rings pulse dramatically, the big anchor
+      // disc barely budges.
       const defocus = Math.max(0, 1 - dist / 55);
 
       // Global amplitude kept close to 1 across the window so more
@@ -178,11 +195,23 @@ export default function SunFlare() {
         const gx = g.t * sx + g.perpOffset;
         const gy = g.t * sy + g.perpOffset * 0.4;
 
-        const scale = 1 + defocus * 0.45;
+        // Size driven by two independent sources so the chain
+        // doesn't inflate in lockstep:
+        //   1. defocus × per-ghost response — physics-ish; the
+        //      ring pumps hard (×1.4), the already-huge anchor
+        //      barely grows (×0.2), glint stays crisp (×0.25).
+        //   2. per-ghost size wobble on its own sine phase — gives
+        //      each reflection its own breath independent of the
+        //      sun's position. Small amplitude so it reads as
+        //      shimmer, not jitter.
+        const sizeWobble =
+          1 + 0.07 * Math.sin(g.sizePhase + cyclePct * 0.11);
+        const scale = (1 + defocus * g.defocusResponse * 0.8) * sizeWobble;
 
-        // Wobble: per-ghost sine so each one breathes at its own
-        // phase. Range 0.8–1.0, so ghosts never go to zero from
-        // wobble alone — only the envelope drives them fully dark.
+        // Alpha wobble: per-ghost sine so each one breathes at
+        // its own phase. Range 0.8–1.0, so ghosts never go to
+        // zero from wobble alone — only the envelope drives them
+        // fully dark.
         const wobble =
           0.9 + 0.1 * Math.sin(g.alphaPhase + cyclePct * 0.14);
 
