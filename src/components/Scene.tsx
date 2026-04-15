@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Earth, { type Ritual, type Witness } from "./Earth";
 import Starfield from "./Starfield";
+import SunFlare from "./SunFlare";
 import TapButton from "./TapButton";
 import Grain from "./Grain";
 import {
@@ -308,18 +309,7 @@ export default function Scene({ lang }: { lang: Lang }) {
     <>
       <Starfield flashAt={flashAt} earthSize={earthSize} />
       <div className="sun-glow" aria-hidden="true" />
-      {/* Lens flare — a chain of ghost reflections that sweeps R→L
-          across the frame as the sun crosses zenith. Locked to the
-          same 153s cycle as .sun-glow so the ghosts land right as
-          the backdrop blows out, no JS needed. */}
-      <div className="sun-flare" aria-hidden="true">
-        <span className="sun-flare__spot sun-flare__spot--round sun-flare__spot--1" />
-        <span className="sun-flare__spot sun-flare__spot--hex sun-flare__spot--2" />
-        <span className="sun-flare__spot sun-flare__spot--round sun-flare__spot--3" />
-        <span className="sun-flare__spot sun-flare__spot--hex sun-flare__spot--4" />
-        <span className="sun-flare__spot sun-flare__spot--round sun-flare__spot--5" />
-        <span className="sun-flare__streak" />
-      </div>
+      <SunFlare />
       <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
           <Earth size={earthSize} ritual={ritual} witnesses={witnesses} />

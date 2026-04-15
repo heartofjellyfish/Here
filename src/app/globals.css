@@ -407,179 +407,71 @@ body {
 }
 
 /* ---------- Sun lens flare ----------
-   A brief cinematic artifact that fires only while the sun is
-   crossing viewport center. The off-screen sun's halo already washes
-   the screen at zenith; the flare adds the near-lens ghosts a real
-   camera would pick up shooting straight into direct light.
-   Optical logic: lens flare ghosts project on the line that passes
-   through the light source AND the lens's optical center (viewport
-   middle), landing on the opposite side of center from the source.
-   Our sun swings L→R across the top of the frame, so the ghost
-   chain traces the reverse path — R→L across the middle. That
-   motion is the whole point: static overlay reads as "decal slapped
-   on the frame," a sweep reads as "a moment of light angle."
-   The chain is five ghosts of varying size and shape (round discs
-   + hexagonal aperture bokeh), plus a faint anamorphic streak.
-   Everything is additive (mix-blend-mode: screen) so the ghosts
-   brighten what's under them instead of tinting it — critical for
-   the "light-leak" reading. Locked to the same 153s cycle as
-   .sun-glow, peak opacity + center position both land at 46%
-   (zenith), and the whole pass is gone in about three seconds —
-   "一闪而过" rather than sustained. */
+   A physics-inspired chain of ghost reflections that live on the
+   axis from the sun through the viewport's optical center. Position,
+   size, and brightness are computed per-frame in JS (see SunFlare.tsx)
+   because the relationships (each ghost at its own axial position →
+   each moves at its own rate, all rotating coherently as the sun
+   swings) aren't expressible as a handful of independent CSS
+   keyframes. The CSS here is just the container and the two ghost
+   visual styles (soft disc, aperture ring).
+   Additive blended (mix-blend-mode: screen) so ghosts brighten the
+   backdrop rather than tinting it — critical for the "light-leak"
+   reading. Each ghost's warm tint comes in via the --ghost-hue
+   custom property set inline. */
 .sun-flare {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  /* Above .sun-glow (z:0) and the stage (z:1–2) so the ghosts can
-     pass over the earth the way a real camera flare would; below
-     .grain (z:5) so the grain still textures it. */
+  /* Above .sun-glow (z:0) and the stage (z:1–2) so the ghosts pass
+     over the earth the way a real camera flare would; below .grain
+     (z:5) so the grain still textures them. */
   z-index: 4;
-  opacity: 0;
   mix-blend-mode: screen;
-  animation: sunFlareCross 153s linear infinite;
-  will-change: opacity, transform;
 }
 
-.sun-flare__spot,
-.sun-flare__streak {
+.sun-flare__ghost {
   position: absolute;
-  will-change: transform;
-}
-
-.sun-flare__spot {
-  filter: blur(3px);
-}
-
-/* Two flavors of ghost: round (bokeh from out-of-focus elements)
-   and hexagonal (aperture iris reflections — the "polygonal
-   highlights" a partly-stopped-down lens leaves behind). Mixing
-   shapes kills the "chain of identical beads" look. */
-.sun-flare__spot--round {
-  border-radius: 50%;
-}
-.sun-flare__spot--hex {
-  /* Flat-top hexagon; rotation varies per-spot below. */
-  clip-path: polygon(
-    50% 3%, 95% 27%, 95% 73%, 50% 97%, 5% 73%, 5% 27%
-  );
-}
-
-/* Five ghosts along a slightly-tilted near-horizontal axis, laid
-   out across most of the viewport width. Sizes and vertical offsets
-   are intentionally uneven — a real flare isn't symmetric, each
-   element reflects off a different lens surface at its own focal
-   depth. The central ghost (spot--3) is the brightest and largest
-   so the chain has a clear weight; the two hexes on either side of
-   it give the aperture-bokeh read that rounds alone wouldn't. */
-.sun-flare__spot--1 {
-  width: clamp(26px, 3.5vmax, 54px);
-  height: clamp(26px, 3.5vmax, 54px);
-  top: 58%;
-  left: 14%;
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 210, 150, 0.42),
-    rgba(255, 180, 120, 0.15) 50%,
-    transparent 82%
-  );
-}
-.sun-flare__spot--2 {
-  width: clamp(52px, 7vmax, 100px);
-  height: clamp(52px, 7vmax, 100px);
   top: 50%;
-  left: 32%;
-  transform: rotate(14deg);
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 240, 210, 0.38),
-    rgba(255, 200, 140, 0.13) 55%,
-    transparent 88%
-  );
+  left: 50%;
+  border-radius: 50%;
+  /* Slight blur softens the gradient stops so the ghosts read as
+     out-of-focus internal reflections rather than sharp circles. */
+  filter: blur(2px);
+  opacity: 0;
+  /* Opacity and transform are driven from JS each frame — hinting
+     them to the compositor avoids layout thrash on style writes. */
+  will-change: transform, opacity;
 }
-.sun-flare__spot--3 {
-  width: clamp(80px, 11vmax, 160px);
-  height: clamp(80px, 11vmax, 160px);
-  top: 45%;
-  left: 48%;
+
+/* Soft disc — an out-of-focus bokeh ghost, the most common kind. A
+   warm center falling through mid tones to a faint outer haze. */
+.sun-flare__ghost--disc {
   background: radial-gradient(
     closest-side,
-    rgba(255, 250, 230, 0.5),
-    rgba(255, 220, 160, 0.18) 45%,
-    transparent 82%
-  );
-}
-.sun-flare__spot--4 {
-  width: clamp(38px, 5vmax, 72px);
-  height: clamp(38px, 5vmax, 72px);
-  top: 53%;
-  left: 66%;
-  transform: rotate(-9deg);
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 220, 170, 0.42),
-    rgba(255, 180, 120, 0.15) 55%,
-    transparent 86%
-  );
-}
-.sun-flare__spot--5 {
-  width: clamp(28px, 4vmax, 60px);
-  height: clamp(28px, 4vmax, 60px);
-  top: 43%;
-  left: 85%;
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 230, 190, 0.42),
-    rgba(255, 190, 130, 0.14) 55%,
-    transparent 86%
+    rgba(var(--ghost-hue), 0.78) 0%,
+    rgba(var(--ghost-hue), 0.52) 25%,
+    rgba(var(--ghost-hue), 0.24) 50%,
+    rgba(var(--ghost-hue), 0.08) 75%,
+    transparent 95%
   );
 }
 
-/* Thin horizontal streak across the optical center — the classic
-   anamorphic line, stretching the flare's horizontal axis. Soft-
-   edged via blur so it reads as a smear of light rather than a bar. */
-.sun-flare__streak {
-  top: 48%;
-  left: -8%;
-  width: 116%;
-  height: clamp(6px, 1vmax, 12px);
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(255, 230, 200, 0.18) 22%,
-    rgba(255, 250, 230, 0.4) 50%,
-    rgba(255, 230, 200, 0.18) 78%,
-    transparent 100%
+/* Aperture-iris ring — a donut-shaped reflection off the stopped-
+   down aperture. Transparent center, warm ring band peaking
+   around 60% of the radius, soft outer falloff. Gives the chain
+   visual variety beyond just filled discs. */
+.sun-flare__ghost--ring {
+  background: radial-gradient(
+    closest-side,
+    transparent 25%,
+    rgba(var(--ghost-hue), 0.06) 42%,
+    rgba(var(--ghost-hue), 0.3) 55%,
+    rgba(var(--ghost-hue), 0.46) 62%,
+    rgba(var(--ghost-hue), 0.24) 72%,
+    rgba(var(--ghost-hue), 0.07) 85%,
+    transparent 95%
   );
-  filter: blur(4px);
-}
-
-/* Chain sweeps from right edge to left edge through the viewport
-   during the zenith window. Position peak and opacity peak both
-   land at 46% (sun exactly at zenith); total on-screen time is
-   about 3 seconds. */
-@keyframes sunFlareCross {
-  0%,
-  45% {
-    opacity: 0;
-    transform: translate(55vw, 0);
-  }
-  45.6% {
-    opacity: 0.35;
-    transform: translate(28vw, 0);
-  }
-  46% {
-    opacity: 0.95;
-    transform: translate(0, 0);
-  }
-  46.5% {
-    opacity: 0.55;
-    transform: translate(-22vw, 0);
-  }
-  47.5%,
-  100% {
-    opacity: 0;
-    transform: translate(-55vw, 0);
-  }
 }
 
 /* ---------- Film grain ----------
