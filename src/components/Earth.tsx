@@ -1114,26 +1114,21 @@ export default function Earth({
       }
 
       // ------ home point ------
-      // The user's own tap, pinned to YOU — not to the globe surface.
-      // Latitude is preserved (a user in Sydney sees their dot in the
-      // southern hemisphere, a user in Oslo sees it up top), but the
-      // longitude is collapsed to the front meridian so the dot stays
-      // exactly where you last saw it during ignite, regardless of
-      // how the earth rotates underneath. Warm amber (matches the
-      // ritual primary) with a slow breathing pulse and an even
-      // slower halo shimmer. Two Math.sin per frame, free. Drawn
-      // after witnesses so it sits on top of any that land in the
-      // same spot.
+      // The user's own tap, pinned to the surface at their real
+      // lat/lon. Turns with the earth like any other geographic
+      // point — rises and sets on its natural rhythm, so it reads as
+      // "your place on the planet," not a HUD element. The ritual
+      // primary and this dot use the same [lat, lon] (precise geoip
+      // when available, otherwise the matching hotspot jitter), so
+      // the handoff from ritual-fade to home lands on the exact same
+      // pixel. Warm amber with a heartbeat pulse.
       {
         const h = homeRef.current;
         if (h) {
-          // Front-meridian projection: x1=0, y1=sin(lat), z1=cos(lat).
-          // Skips the rotation matrix entirely — only the tilt applies,
-          // so the dot rides the 18° tilt but never the spin.
-          const latR = (h.pos[0] * Math.PI) / 180;
-          const x1 = 0;
-          const y1 = Math.sin(latR);
-          const z1 = Math.cos(latR);
+          const wv = latLonToVec(h.pos[0], h.pos[1]);
+          const x1 = wv[0] * cosR + wv[2] * sinR;
+          const y1 = wv[1];
+          const z1 = -wv[0] * sinR + wv[2] * cosR;
           const rx = x1 * COS_T - y1 * SIN_T;
           const ry = x1 * SIN_T + y1 * COS_T;
           const rz = z1;
