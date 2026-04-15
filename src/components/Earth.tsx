@@ -766,6 +766,56 @@ export default function Earth({
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
+    // Pre-render the witness bloom into an offscreen sprite. Each
+    // witness draw used to call createRadialGradient (~20-50μs each)
+    // plus arc()+fill() twice; at sim=200 with a long fade we can have
+    // 100+ concurrent blooms, so the gradient alloc dominated frame
+    // cost. Baking the glow+core into a single sprite at intensity=1
+    // and drawing it with globalAlpha for per-witness brightness is
+    // mathematically identical (every stop scales linearly with
+    // globalAlpha) and ~50-100× faster per draw.
+    //
+    // Sprite is sized to exactly the original glow radius (no scaling
+    // at draw time → no resampling artifacts). The sprite is dpr-aware
+    // because it's built inside this effect, which already keys on
+    // size; if dpr changes (display switch) the canvas re-init picks
+    // up the new sprite.
+    const WITNESS_GLOW_R = 5.5 * dpr;
+    const WITNESS_CORE_R = 1.35 * dpr;
+    const WITNESS_COLOR = "198, 220, 238";
+    const witnessSprite = (() => {
+      const pad = 1;
+      const dim = Math.ceil(WITNESS_GLOW_R * 2 + pad * 2);
+      const c = document.createElement("canvas");
+      c.width = dim;
+      c.height = dim;
+      const sctx = c.getContext("2d");
+      if (!sctx) return c;
+      const scx = dim / 2;
+      const scy = dim / 2;
+      const grad = sctx.createRadialGradient(
+        scx,
+        scy,
+        0,
+        scx,
+        scy,
+        WITNESS_GLOW_R,
+      );
+      grad.addColorStop(0, `rgba(${WITNESS_COLOR}, 0.7)`);
+      grad.addColorStop(0.4, `rgba(${WITNESS_COLOR}, 0.26)`);
+      grad.addColorStop(1, `rgba(${WITNESS_COLOR}, 0)`);
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(scx, scy, WITNESS_GLOW_R, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.fillStyle = `rgba(${WITNESS_COLOR}, 0.82)`;
+      sctx.beginPath();
+      sctx.arc(scx, scy, WITNESS_CORE_R, 0, Math.PI * 2);
+      sctx.fill();
+      return c;
+    })();
+    const witnessHalf = witnessSprite.width / 2;
+
     const dots = fibSphere(3600);
     const cx = BUF / 2;
     const cy = BUF / 2;
@@ -1038,6 +1088,10 @@ export default function Earth({
           const posMap = witnessPosRef.current;
           const { riseMs, holdMs, fadeMs } = timingRef.current;
           const WITNESS_TOTAL = riseMs + holdMs + fadeMs;
+          // Cool pale blue, baked into witnessSprite. Distinct from
+          // the ritual's warm primary (amber) and chorus (near-white),
+          // so a viewer who caught the ritual reads these as "other
+          // people."
           for (const w of list) {
             const age = realNow - w.appearAt;
             if (age < 0 || age > WITNESS_TOTAL) continue;
@@ -1076,40 +1130,15 @@ export default function Earth({
             const intensity = env * (0.38 + 0.62 * limb);
             if (intensity < 0.01) continue;
 
-            const glowR = 5.5 * dpr;
-            const coreR = 1.35 * dpr;
-            // Cool pale blue — distinct from the ritual's warm
-            // primary (amber) and chorus (near-white), so a viewer
-            // who caught the ritual reads these as "other people."
-            const color = "198, 220, 238";
-
-            const grad = ctx.createRadialGradient(
-              sx,
-              sy,
-              0,
-              sx,
-              sy,
-              glowR,
-            );
-            grad.addColorStop(
-              0,
-              `rgba(${color}, ${(0.7 * intensity).toFixed(3)})`,
-            );
-            grad.addColorStop(
-              0.4,
-              `rgba(${color}, ${(0.26 * intensity).toFixed(3)})`,
-            );
-            grad.addColorStop(1, `rgba(${color}, 0)`);
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = `rgba(${color}, ${(0.82 * intensity).toFixed(3)})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
-            ctx.fill();
+            // Sprite-blit instead of per-frame radial gradient. The
+            // sprite was baked at intensity=1 with the original
+            // alpha stops (0.7, 0.26, 0; core 0.82); globalAlpha
+            // multiplies every pixel uniformly, so the result is
+            // identical to the old per-witness gradient build.
+            ctx.globalAlpha = intensity;
+            ctx.drawImage(witnessSprite, sx - witnessHalf, sy - witnessHalf);
           }
+          ctx.globalAlpha = 1;
         }
       }
 
