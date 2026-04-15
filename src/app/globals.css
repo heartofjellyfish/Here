@@ -1,0 +1,594 @@
+:root {
+  --bg: #060709;
+  --ink: #d4dae2;
+  --ink-soft: #a9b0b9;
+  --ink-muted: #6a7280;
+  --ink-faint: #3e4651;
+  --star: #d2d8df;
+
+  /* Serif stacks per script. System fonts only — no web font loads,
+     no FOUC, calm by default. */
+  --font-cjk-serif:
+    "Songti SC", "STSong", "Hiragino Mincho ProN", "Yu Mincho",
+    "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+  --font-latin-serif:
+    "Iowan Old Style", "Palatino Linotype", "Palatino", "Book Antiqua",
+    "Georgia", "Times New Roman", serif;
+  --font-ar-serif:
+    "Amiri", "Noto Naskh Arabic", "Times New Roman", serif;
+  --font-sans-sys:
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans-sys);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 300;
+  overscroll-behavior: none;
+}
+
+html,
+body {
+  min-height: 100dvh;
+}
+
+/* ---------- Starfield ---------- */
+
+.starfield {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  background: var(--star);
+  border-radius: 50%;
+  opacity: var(--star-min, 0.08);
+  animation: twinkle ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: var(--star-min);
+  }
+  50% {
+    opacity: var(--star-max);
+  }
+}
+
+.meteor-wrap {
+  position: absolute;
+  width: 0;
+  height: 0;
+  /* `transform: rotate(...)` is set inline per meteor. */
+}
+
+.meteor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  /* Long, soft falloff toward the head so the trail reads as a streak
+     of light fading behind a moving point — not a rectangle. */
+  background: linear-gradient(
+    to right,
+    rgba(210, 216, 223, 0) 0%,
+    rgba(210, 216, 223, 0.05) 12%,
+    rgba(210, 216, 223, 0.22) 45%,
+    rgba(210, 216, 223, 0.55) 78%,
+    rgba(225, 230, 238, 0.95) 96%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  opacity: 0;
+  animation: meteorSlide ease-out forwards;
+  filter: blur(0.3px);
+}
+
+@keyframes meteorSlide {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--meteor-peak, 0.85);
+  }
+  85% {
+    opacity: var(--meteor-peak, 0.85);
+  }
+  100% {
+    transform: translate(var(--meteor-travel, 60vmin), 0);
+    opacity: 0;
+  }
+}
+
+/* ---------- Sun afterglow ----------
+   The sun itself is far off-screen — what reaches us is only the outer
+   rim of its halo. The gradient stops are HOLLOW at the inner radii
+   (alpha 0 from 0–40%), peak at ~70%, and fade out by 100%. So the
+   "core" of the gradient closest to the off-screen sun shows nothing,
+   and only the dim ring of light bleeds across the upper part of the
+   viewport.
+   Two stacked asymmetric patches give the layer a non-radial structure,
+   which makes the slow rotation/drift visible — without asymmetry,
+   rotating a perfectly symmetric radial gradient produces no visible
+   change. The animation cycles over 240s, so on any given glance the
+   warmth seems still; come back later and it has shifted. */
+
+.sun-glow {
+  /* Box is 180vmax × 180vmax and centered on the viewport by default.
+     `translate(x, y)` in the keyframes then slides the box along a
+     parabolic arc — sunrise on the lower-left, zenith crossing right
+     through the viewport center, sunset on the lower-right, then a
+     long night beneath the world. `closest-side` gives a gradient
+     radius of 90vmax, so once the box's center is anywhere near the
+     viewport the warmth reaches every pixel; at the zenith the bright
+     inner stops land on the center of the screen and wash out the
+     whole view. */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 180vmax;
+  height: 180vmax;
+  margin-left: -90vmax;
+  margin-top: -90vmax;
+  pointer-events: none;
+  z-index: 0;
+  /* Flatter inner profile: the top 40% of the gradient holds a strong
+     warm alpha so that at peak opacity the viewport center reads as
+     backlit glare, not a warm tint. Past 65% the gradient drops off
+     steeply so off-peak phases don't smear across the whole screen. */
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 230, 200, 0.5) 0%,
+    rgba(255, 222, 180, 0.42) 12%,
+    rgba(255, 212, 164, 0.3) 28%,
+    rgba(255, 200, 148, 0.17) 46%,
+    rgba(255, 188, 132, 0.08) 66%,
+    rgba(255, 175, 120, 0.025) 84%,
+    transparent 97%
+  );
+  opacity: 0;
+  filter: blur(3px);
+  animation: sunArc 180s linear infinite;
+}
+
+/* Sun parabolic arc. Translate is in vw/vh so the path stays
+   consistent across aspect ratios. The y component follows
+   y = 0.013 * x² - 10, so the apex sits ~10vh above viewport center
+   and the endpoints are ~45vh below (near the bottom horizon).
+   Day phase is 0 → 78% of the cycle; the remaining 22% is below-
+   horizon "night" where opacity is 0. */
+@keyframes sunArc {
+  /* --- sunrise (off-screen lower-left, rising slowly through the
+     lower-left quadrant of the viewport before climbing) --- */
+  0% {
+    transform: translate(-80vw, 60vh);
+    opacity: 0;
+  }
+  6% {
+    transform: translate(-70vw, 52vh);
+    opacity: 0;
+  }
+  11% {
+    transform: translate(-62vw, 40vh);
+    opacity: 0.18;
+  }
+  17% {
+    transform: translate(-52vw, 25vh);
+    opacity: 0.32;
+  }
+  24% {
+    transform: translate(-40vw, 11vh);
+    opacity: 0.48;
+  }
+  31% {
+    transform: translate(-26vw, -1vh);
+    opacity: 0.62;
+  }
+  38% {
+    transform: translate(-13vw, -7vh);
+    opacity: 0.82;
+  }
+  /* --- zenith (crossing viewport center, gradient blinds the screen) --- */
+  46% {
+    transform: translate(0, -10vh);
+    opacity: 1;
+  }
+  54% {
+    transform: translate(13vw, -7vh);
+    opacity: 0.82;
+  }
+  61% {
+    transform: translate(26vw, -1vh);
+    opacity: 0.62;
+  }
+  68% {
+    transform: translate(40vw, 11vh);
+    opacity: 0.48;
+  }
+  75% {
+    transform: translate(52vw, 25vh);
+    opacity: 0.32;
+  }
+  82% {
+    transform: translate(62vw, 40vh);
+    opacity: 0.18;
+  }
+  88% {
+    transform: translate(70vw, 52vh);
+    opacity: 0;
+  }
+  /* --- night (sun swings far below the world; invisible) --- */
+  92% {
+    transform: translate(100vw, 130vh);
+    opacity: 0;
+  }
+  97% {
+    transform: translate(-100vw, 130vh);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-80vw, 60vh);
+    opacity: 0;
+  }
+}
+
+/* ---------- Film grain ----------
+   Static SVG noise tiled across the viewport at very low opacity. Hides
+   banding, gives the dark background analog texture. Sits above everything
+   else but is non-interactive. */
+
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+.grain svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Stage ---------- */
+
+.stage {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 5vh, 44px);
+  padding: 8vh 24px 10vh;
+  text-align: center;
+}
+
+/* ---------- Earth ---------- */
+
+.earth-wrap {
+  opacity: 0;
+  transform: scale(0.985);
+  transition: opacity 2400ms ease, transform 2400ms ease;
+}
+.stage--idle .earth-wrap,
+.stage--dissolving .earth-wrap,
+.stage--revealed .earth-wrap {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.earth {
+  display: block;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 0 30px rgba(120, 140, 170, 0.05));
+  animation: earthBreath 11s ease-in-out infinite;
+}
+
+@keyframes earthBreath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.009);
+  }
+}
+
+/* ---------- Phrase ---------- */
+
+.phrase {
+  margin: 0;
+  font-family: var(--font-latin-serif);
+  font-weight: 400;
+  font-size: clamp(28px, 6.5vw, 38px);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  position: relative;
+  line-height: 1.15;
+  transition: opacity 2400ms ease, filter 2400ms ease,
+    transform 2400ms cubic-bezier(0.35, 0, 0.65, 1);
+  /* Make sure characters can blur off-stage without clipping or scrollbars. */
+  will-change: transform, filter, opacity;
+}
+
+.font-cjk .phrase {
+  font-family: var(--font-cjk-serif);
+  letter-spacing: 0.28em;
+  /* Optical centering: trailing letter-spacing pushes glyphs left. */
+  padding-left: 0.28em;
+  font-weight: 400;
+}
+.font-ar .phrase {
+  font-family: var(--font-ar-serif);
+  letter-spacing: 0;
+  direction: rtl;
+}
+
+.phrase__char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 1800ms ease var(--char-delay, 300ms),
+    transform 1800ms ease var(--char-delay, 300ms);
+}
+.stage--idle .phrase__char,
+.stage--dissolving .phrase__char,
+.stage--revealed .phrase__char {
+  opacity: 0.92;
+  transform: translateY(0);
+}
+
+/* The phrase wisps into the earth on tap. The phrase ancestor's opacity
+   cascades — chars stay at 0.92 in their own rule, but you see 0. */
+.stage--dissolving .phrase,
+.stage--revealed .phrase {
+  opacity: 0;
+  filter: blur(14px);
+  transform: translate(var(--wisp-dx, 0), var(--wisp-dy, -200px)) scale(0.45);
+}
+
+/* ---------- Tap ---------- */
+
+.tap-wrap {
+  opacity: 0;
+  transition: opacity 1400ms ease 1500ms;
+  will-change: transform, filter, opacity;
+}
+.stage--idle .tap-wrap {
+  opacity: 1;
+}
+.stage--dissolving .tap-wrap,
+.stage--revealed .tap-wrap {
+  opacity: 0;
+  filter: blur(14px);
+  transform: translate(var(--wisp-dx, 0), var(--wisp-dy, -200px)) scale(0.55);
+  transition:
+    opacity 2400ms ease-in,
+    filter 2400ms ease-in,
+    transform 2400ms cubic-bezier(0.35, 0, 0.65, 1);
+  pointer-events: none;
+}
+
+.tap {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 12px 22px;
+  color: var(--ink-soft);
+  font-family: var(--font-latin-serif);
+  font-size: 15px;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  position: relative;
+  transition: color 500ms ease, transform 300ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The hairline that hints "this is interactive" — fades in on hover/focus. */
+.tap::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 14px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 400ms ease, width 400ms ease;
+}
+
+.tap:hover,
+.tap:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+.tap:hover::after,
+.tap:focus-visible::after {
+  opacity: 0.5;
+  width: 24px;
+}
+
+.tap:disabled {
+  cursor: default;
+}
+
+.tap__glyph {
+  position: relative;
+  z-index: 1;
+}
+
+.tap__ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: rgba(210, 216, 223, 0.28);
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.tap--pressed .tap__ripple {
+  animation: ripple 900ms ease-out forwards;
+}
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(16);
+    opacity: 0;
+  }
+}
+
+/* ---------- Reveal ---------- */
+
+.reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 32ch;
+}
+
+.reveal__ack,
+.reveal__resonance,
+.reveal__presence {
+  margin: 0;
+  opacity: 0;
+  transform: translateY(6px);
+  font-family: var(--font-latin-serif);
+  transition: opacity 1800ms ease, transform 1800ms ease;
+}
+
+.font-cjk .reveal__ack,
+.font-cjk .reveal__resonance,
+.font-cjk .reveal__presence {
+  font-family: var(--font-cjk-serif);
+}
+.font-ar .reveal__ack,
+.font-ar .reveal__resonance,
+.font-ar .reveal__presence {
+  font-family: var(--font-ar-serif);
+}
+
+.reveal__ack {
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.font-cjk .reveal__ack {
+  letter-spacing: 0.14em;
+}
+
+.reveal__resonance {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  margin-top: 4px;
+}
+.font-cjk .reveal__resonance {
+  letter-spacing: 0.16em;
+}
+
+.reveal__presence {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  margin-top: 14px;
+  min-height: 1em; /* reserve space so the layout doesn't shift */
+}
+.font-cjk .reveal__presence {
+  letter-spacing: 0.22em;
+}
+
+/* Staggered reveal timeline (relative to entering "revealed"):
+     0.8s   the user's country lights up on the earth (driven by canvas)
+     1.4s   ack fades in
+     2.8s   resonance fades in
+     4.4s   presence fades in
+*/
+.stage--revealed .reveal__ack {
+  opacity: 0.92;
+  transform: none;
+  transition-delay: 1400ms;
+}
+.stage--revealed .reveal__resonance {
+  opacity: 1;
+  transform: none;
+  transition-delay: 2800ms;
+}
+.stage--revealed .reveal__presence {
+  opacity: 1;
+  transform: none;
+  transition-delay: 4400ms;
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .earth,
+  .earth-wrap,
+  .phrase,
+  .phrase__char,
+  .tap,
+  .tap-wrap,
+  .star,
+  .meteor,
+  .sun-glow,
+  .reveal__ack,
+  .reveal__resonance,
+  .reveal__presence {
+    transition: none;
+    animation: none;
+  }
+  .stage--idle .phrase__char,
+  .stage--idle .tap-wrap {
+    opacity: 1;
+    transform: none;
+  }
+  /* Skip the wisp — go straight to invisible. */
+  .stage--dissolving .phrase,
+  .stage--revealed .phrase,
+  .stage--dissolving .tap-wrap,
+  .stage--revealed .tap-wrap {
+    opacity: 0;
+    transform: none;
+    filter: none;
+  }
+  .stage--revealed .reveal__ack,
+  .stage--revealed .reveal__resonance,
+  .stage--revealed .reveal__presence {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0ms;
+  }
+}
