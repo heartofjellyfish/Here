@@ -350,15 +350,19 @@ body {
     transform: translate(-45vw, 20vh);
     opacity: 0.5;
   }
-  12% {
+  /* After the flare chain starts building (~9%), the sun picks up
+     a small extra pace — each of the next three waypoints was
+     shifted 1% (~1.5s) earlier so the arc reaches zenith with a
+     touch more momentum. Peak time locked at 46%. */
+  11% {
     transform: translate(-36vw, 10vh);
     opacity: 0.6;
   }
-  20% {
+  19% {
     transform: translate(-24vw, 0);
     opacity: 0.72;
   }
-  32% {
+  31% {
     transform: translate(-12vw, -8vh);
     opacity: 0.86;
   }

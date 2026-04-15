@@ -34,9 +34,13 @@ const SUN_WAYPOINTS: ReadonlyArray<readonly [number, number, number]> = [
   [1.5, -70, 50],
   [3, -58, 35],
   [6, -45, 20],
-  [12, -36, 10],
-  [20, -24, 0],
-  [32, -12, -8],
+  // After the flare chain lights up (~9%), the sun picks up a
+  // touch of extra speed — intermediate waypoints shifted 1% (~1.5s)
+  // earlier so each station is reached sooner. Subtle; the peak
+  // time stays locked at 46% so flare sync is preserved.
+  [11, -36, 10],
+  [19, -24, 0],
+  [31, -12, -8],
   [46, 0, -13],
   [54, 13, -9],
   [61, 26, -1],
@@ -60,6 +64,11 @@ const SUN_CYCLE_MS = 153_000;
 // envelope kept the flare lingering well into the sun's descent,
 // which felt like it overstayed.
 const FLARE_WINDOW_START = 9;
+// The diffraction starburst leads the ghost chain by ~4% (~6s):
+// it seeps in from 5% with its own ease-in curve, so by the time
+// the ghosts arrive at 9% the spikes are already softly present.
+// Starburst shares PEAK and END with the ghost chain.
+const STARBURST_WINDOW_START = 5;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
 // 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 65.6 → 19.6% past
 // peak → ~30s fade past zenith. The shape of the fade (see the
@@ -195,27 +204,52 @@ export default function SunFlare() {
       // Envelope: zero outside the window. Peak is pinned to the
       // sun's zenith (46%), not the window midpoint — a symmetric
       // bell would peak before zenith, which looks wrong.
-      //   Rise (START → PEAK): quarter-sine — slow start, building.
+      //   Rise (START → PEAK): pow(u, 1.6) — ease-IN. Invisible at
+      //                        first, seeps in quietly, then builds
+      //                        quickly toward the peak. Replaced
+      //                        the previous sin(u*π/2), which was
+      //                        ease-OUT (fast start) and made the
+      //                        chain feel like it popped into
+      //                        existence.
       //   Fall (PEAK → END):   pow(1-u, 2.2) — drops ~half in the
       //                        first 30% of the fall window, then a
       //                        long slow tail that reaches zero at
-      //                        the very end. Feels like the flare
-      //                        losing energy gradually, not snapping
-      //                        off; "mostly gone" lives around the
-      //                        midpoint of the fall, "completely
-      //                        gone" only at the end.
+      //                        the very end. "Mostly gone" around
+      //                        the midpoint, "completely gone" only
+      //                        at the end.
       let envelope = 0;
       if (cyclePct >= FLARE_WINDOW_START && cyclePct <= FLARE_WINDOW_END) {
         if (cyclePct < FLARE_WINDOW_PEAK) {
           const u =
             (cyclePct - FLARE_WINDOW_START) /
             (FLARE_WINDOW_PEAK - FLARE_WINDOW_START);
-          envelope = Math.sin((u * Math.PI) / 2);
+          envelope = Math.pow(u, 1.6);
         } else {
           const u =
             (cyclePct - FLARE_WINDOW_PEAK) /
             (FLARE_WINDOW_END - FLARE_WINDOW_PEAK);
           envelope = Math.pow(1 - u, 2.2);
+        }
+      }
+
+      // Starburst envelope — same PEAK and END as ghost chain but
+      // with its own earlier START and a gentler ease-in exponent
+      // (1.3 vs 1.6) so by the time the ghost chain is barely on
+      // screen, the spikes are already softly present. Reads as
+      // "the light announces itself first, then the lens artifacts
+      // catch up."
+      let burstEnvelope = 0;
+      if (cyclePct >= STARBURST_WINDOW_START && cyclePct <= FLARE_WINDOW_END) {
+        if (cyclePct < FLARE_WINDOW_PEAK) {
+          const u =
+            (cyclePct - STARBURST_WINDOW_START) /
+            (FLARE_WINDOW_PEAK - STARBURST_WINDOW_START);
+          burstEnvelope = Math.pow(u, 1.3);
+        } else {
+          const u =
+            (cyclePct - FLARE_WINDOW_PEAK) /
+            (FLARE_WINDOW_END - FLARE_WINDOW_PEAK);
+          burstEnvelope = Math.pow(1 - u, 2.2);
         }
       }
 
@@ -327,11 +361,11 @@ export default function SunFlare() {
         // sun is a scene object, only the flare ghosts parallax.
         const bx = rawSx;
         const by = rawSy;
-        // Strongly peaked at center, not a flat envelope — the
-        // spikes are most dramatic when the sun is dead-on, and
-        // nearly invisible when it's off to the side. Cube of
-        // envelope shapes that curve.
-        const burstAlpha = Math.pow(envelope, 1.4) * (0.35 + defocus * 0.65);
+        // Strongly peaked at center: the spikes are most dramatic
+        // when the sun is dead-on, and nearly invisible when it's
+        // far off-axis. burstEnvelope already carries the ease-in
+        // shape, so no extra pow() needed here.
+        const burstAlpha = burstEnvelope * (0.35 + defocus * 0.65);
         const burstScale = 0.8 + defocus * 0.9;
         const burstRot = (now * 0.006) % 360;
         starburstRef.current.style.transform =
