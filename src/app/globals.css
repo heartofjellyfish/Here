@@ -164,10 +164,6 @@ body {
   opacity: 0;
   filter: blur(3px);
   animation: sunArc 180s linear infinite;
-  /* Skip the ~11s pre-dawn "dead zone" on first load — start the
-     animation as if it had already been running for 22s, which lands
-     just after the sun first becomes faintly visible (11% keyframe). */
-  animation-delay: -22s;
 }
 
 /* Sun parabolic arc. Translate is in vw/vh so the path stays
@@ -183,9 +179,15 @@ body {
     transform: translate(-80vw, 60vh);
     opacity: 0;
   }
+  /* ~1s in (0.6% of a 180s cycle), the first warm fringe touches
+     the lower-left corner — the "光缓缓进来" moment. */
+  0.6% {
+    transform: translate(-79vw, 59vh);
+    opacity: 0.06;
+  }
   6% {
     transform: translate(-70vw, 52vh);
-    opacity: 0;
+    opacity: 0.12;
   }
   11% {
     transform: translate(-62vw, 40vh);
