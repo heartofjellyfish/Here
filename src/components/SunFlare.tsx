@@ -493,6 +493,43 @@ export default function SunFlare() {
 
   return (
     <div className="sun-flare" aria-hidden="true">
+      {/* Turbulence filter for god rays — breaks the clean
+          repeating-conic-gradient spokes into fuzzy, variable-length
+          strands. Single-stage: one turbulence + one displacement,
+          baseFrequency anisotropic (low X, high Y) so the noise is
+          streaky rather than granular — the displacement elongates
+          strands along their local ray direction instead of dotting
+          them with uniform speckle. Scale kept modest (22) so the
+          rays still read as rays and don't melt into abstract noise.
+          Tried a two-stage warp once (scale 55 + 28) to push toward
+          "迷离" — it made the rays curve into wavy parallel bands
+          that read as stretch marks, not light. This single-stage
+          version is the right intensity: rough enough to escape
+          the "CSS pinwheel" look, not so strong that the rays stop
+          being straight. */}
+      <svg
+        aria-hidden="true"
+        width="0"
+        height="0"
+        style={{ position: "absolute", pointerEvents: "none" }}
+      >
+        <filter id="sun-flare-rays-turbulence">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.018 0.55"
+            numOctaves="2"
+            seed="4"
+            result="noise"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="22"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </svg>
       <div ref={godRaysRef} className="sun-flare__rays" />
       <div ref={starburstRef} className="sun-flare__starburst" />
       {GHOSTS.map((g, i) => (

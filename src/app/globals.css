@@ -546,96 +546,99 @@ body {
    Built from two crossed horizontal/vertical gradient bars; JS
    adds a slow rotation each frame so the spikes don't read as
    static decal. Blend-mode inherited from .sun-flare. */
-/* God rays — sharp camera-starburst needles radiating from the sun.
-   Prior version used SVG turbulence to warp clean conic spokes into
-   fuzzy strands, which read as "stretch marks" (user: 妊娠纹) — the
-   warp bent regular spokes into wavy parallel bands, not light. This
-   version drops the displacement filter entirely and commits to the
-   spectacle of a proper diffraction-style starburst: many very thin
-   sharp needles in a clear bright/dim hierarchy, fading radially.
-   Two layers form the hierarchy:
-     - Primary: 6 bright long needles every 60° (dominant spikes)
-     - Secondary: 12 dimmer thinner needles every 30°, offset 15°
-       (filler spikes that soften the 6-point regularity without
-       erasing it — so the eye reads "starburst" not "wheel")
-   Each needle is ~0.3° wide with a soft-shouldered alpha profile
-   (transparent → mid → bright peak → mid → transparent) so the edges
-   feather rather than aliasing. No turbulence, no warp, no displacement
-   map — just stacked conic gradients + a tiny 0.6px blur for pixel
-   softness. Performance: ~10× cheaper than the previous SVG filter
-   pipeline, and the rotation transform now lives entirely on the GPU
-   compositor (the old filter forced CPU re-rasterization every frame
-   on rotation). Important on mobile. */
+/* God rays — volumetric crepuscular shafts radiating from the sun.
+   NOT a lens artifact: this is light scattering through particles
+   in the scene. Built from three layered repeating-conic-gradients
+   at different angular periods (7°, 11°, 23°) — their interference
+   produces non-uniform ray spacing, so the rays don't read as a
+   machine-regular pinwheel. A radial mask hollows the center (rays
+   start some distance out from the sun, not from its surface) and
+   fades the outer edge so they dissolve into the backdrop rather
+   than ending at a hard circle.
+   Kept deliberately restrained: low per-ray alpha, narrow time
+   window (see GODRAYS_WINDOW_* in SunFlare.tsx), soft blur so
+   each ray reads as a shaft of dust-scattered light, not a line.
+   History note: a sharper camera-starburst variant (two stacked
+   conic needles, no turbulence) was tried and read too static /
+   too CSS-clean. A heavier two-stage turbulence warp was also
+   tried and read as stretch marks (user: 妊娠纹). This single-
+   stage fuzz is the version that kept the rotation-alive feeling
+   without either failure mode. */
 .sun-flare__rays {
   position: absolute;
-  /* Anchored at viewport center. JS offsets by the sun's (vw, vh)
-     position relative to viewport center. */
+  /* Anchored at viewport center like the ghosts and the starburst,
+     so JS can offset by the sun's (vw, vh) position relative to
+     viewport center. */
   top: 50%;
   left: 50%;
-  width: 180vmax;
-  height: 180vmax;
+  width: 200vmax;
+  height: 200vmax;
   pointer-events: none;
   opacity: 0;
   will-change: transform, opacity;
   background-image:
-    /* Primary needles — 6 bright long spikes every 60°.
-       Each spike: soft shoulders 0.15°, peak 0.3° wide.
-       Brightness high (0.55 peak) so these read as the dominant axes. */
     repeating-conic-gradient(
       from 0deg at 50% 50%,
       transparent 0deg,
-      transparent 29.7deg,
-      rgba(255, 240, 210, 0.2) 29.85deg,
-      rgba(255, 248, 225, 0.55) 30deg,
-      rgba(255, 240, 210, 0.2) 30.15deg,
-      transparent 30.3deg,
-      transparent 60deg
+      rgba(255, 240, 210, 0.1) 0.6deg,
+      rgba(255, 240, 210, 0.14) 0.9deg,
+      rgba(255, 240, 210, 0.1) 1.2deg,
+      transparent 1.8deg,
+      transparent 7deg
     ),
-    /* Secondary needles — 12 dimmer finer spikes every 30°, offset
-       by 15° so they interleave with the primary 6. Half the peak
-       alpha of the primaries — clearly subordinate. */
     repeating-conic-gradient(
-      from 15deg at 50% 50%,
+      from 3.7deg at 50% 50%,
       transparent 0deg,
-      transparent 14.8deg,
-      rgba(255, 235, 195, 0.1) 14.92deg,
-      rgba(255, 240, 205, 0.28) 15deg,
-      rgba(255, 235, 195, 0.1) 15.08deg,
-      transparent 15.2deg,
-      transparent 30deg
+      rgba(255, 235, 195, 0.07) 0.5deg,
+      rgba(255, 235, 195, 0.09) 0.8deg,
+      transparent 1.3deg,
+      transparent 11deg
+    ),
+    repeating-conic-gradient(
+      from 8.2deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 245, 215, 0.11) 0.8deg,
+      rgba(255, 245, 215, 0.15) 1.1deg,
+      rgba(255, 245, 215, 0.11) 1.4deg,
+      transparent 2deg,
+      transparent 23deg
     );
-  /* Radial mask — transparent tiny core (don't overpaint the sun
-     itself), quick ramp to full, then a long slow fade to edge.
-     The fade is gentler than the prior version (0.9 at 40%, still
-     0.4 at 70%) so the primary needles reach visibly far — the
-     spectacle of the starburst is in the *reach* of the long
-     spikes, not a tight bright halo. */
+  /* Single radial mask centered at the sun — brightest at the
+     source, fading outward. Previously there was a second conic-
+     gradient mask carving a 120° forward cone; it was dropped
+     because the wide cone visually read as "a wedge of parallel
+     streaks in the upper half of the frame" rather than "rays
+     radiating from a point." Without the cone, rays fan in all
+     directions from the sun position — which is what real
+     volumetric scatter does — and the clear radial convergence
+     at the sun sells the "from the sun" reading. */
   -webkit-mask-image: radial-gradient(
     closest-side at 50% 50%,
-    transparent 0%,
-    transparent 3%,
-    rgba(0, 0, 0, 0.7) 9%,
-    black 20%,
-    rgba(0, 0, 0, 0.9) 40%,
-    rgba(0, 0, 0, 0.6) 60%,
-    rgba(0, 0, 0, 0.25) 82%,
+    black 0%,
+    black 28%,
+    rgba(0, 0, 0, 0.6) 44%,
+    rgba(0, 0, 0, 0.22) 68%,
+    rgba(0, 0, 0, 0.06) 86%,
     transparent 100%
   );
   mask-image: radial-gradient(
     closest-side at 50% 50%,
-    transparent 0%,
-    transparent 3%,
-    rgba(0, 0, 0, 0.7) 9%,
-    black 20%,
-    rgba(0, 0, 0, 0.9) 40%,
-    rgba(0, 0, 0, 0.6) 60%,
-    rgba(0, 0, 0, 0.25) 82%,
+    black 0%,
+    black 28%,
+    rgba(0, 0, 0, 0.6) 44%,
+    rgba(0, 0, 0, 0.22) 68%,
+    rgba(0, 0, 0, 0.06) 86%,
     transparent 100%
   );
-  /* Tiny blur for pixel-edge softness — NOT a warp or smear. Just
-     enough to kill aliasing on the razor-thin spikes. Any more and
-     the spikes lose their sharp camera-lens character. */
-  filter: blur(0.6px);
+  /* Turbulence first, then blur. Single-stage feTurbulence +
+     feDisplacementMap (defined inline in SunFlare.tsx) breaks the
+     clean conic spokes into variable-length fuzzy strands —
+     "毛毛躁躁" like real volumetric scatter through uneven air,
+     rather than CSS-obvious uniform spokes. Blur after softens the
+     displaced edges so they read as light, not noise. 1.8px is the
+     sweet spot: enough softness that edges feather, not so much
+     that the ray structure dissolves. */
+  filter: url(#sun-flare-rays-turbulence) blur(1.8px);
 }
 
 .sun-flare__starburst {
