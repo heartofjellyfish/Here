@@ -23,6 +23,15 @@ type TapResponse = {
 };
 
 const DISSOLVE_MS = 2400;
+/**
+ * How long to wait, after the highlight array is set, before the glow
+ * actually renders. The Earth kicks off its rotation snap the moment a
+ * new primary highlight appears, so scheduling `startedAt` this far in
+ * the future means the camera finishes sweeping to the country *before*
+ * the light blooms — you see the point get lit, not arrive already-lit.
+ * Tuned against the snap easing (0.05/frame → ~98.6% settled by 1400ms).
+ */
+const ROTATION_SETTLE_MS = 1400;
 
 export default function Scene({ lang }: { lang: Lang }) {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -128,9 +137,14 @@ export default function Scene({ lang }: { lang: Lang }) {
       const next: EarthHighlight[] = [];
       const now = Date.now();
 
+      // Earth rotates to the user's country the moment we hand it the
+      // primary highlight, but we hold off on actually *lighting* it until
+      // the camera has swept into place — otherwise the country arrives
+      // already-lit, robbing the moment of its little "ignition."
+      const litAt = now + ROTATION_SETTLE_MS;
+
       if (data.country) {
-        // The wisp has just "arrived" — primary lights immediately.
-        next.push({ country: data.country, primary: true, startedAt: now });
+        next.push({ country: data.country, primary: true, startedAt: litAt });
       }
       if (data.recentCountries) {
         for (const c of data.recentCountries) {
@@ -139,7 +153,7 @@ export default function Scene({ lang }: { lang: Lang }) {
             country: c,
             primary: false,
             // Resonance pulses follow the user's own light, staggered.
-            startedAt: now + 700 + Math.random() * 1800,
+            startedAt: litAt + 700 + Math.random() * 1800,
           });
         }
       }
