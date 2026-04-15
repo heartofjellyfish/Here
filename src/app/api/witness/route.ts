@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { synthesizeAmbientTaps, tapsSince } from "@/lib/db";
+import {
+  synthesizeAmbientTaps,
+  synthesizeSimulatedTaps,
+  tapsSince,
+} from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +33,10 @@ export const dynamic = "force-dynamic";
  *     events with the same timestamps, so the client can't
  *     double-bloom one, and nothing is ever missed if a poll is
  *     delayed.
+ *   - Simulated high-rate traffic (WITNESS_SIMULATE_QPS env var) —
+ *     a stand-in for the real audience we don't have yet. Same
+ *     deterministic-boundary trick as ambient, just at a much finer
+ *     cadence (20ms at 50 qps). Off by default.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -48,10 +56,11 @@ export async function GET(req: NextRequest) {
 
   const real = tapsSince(since, now);
   const ambient = synthesizeAmbientTaps(since, now);
+  const simulated = synthesizeSimulatedTaps(since, now);
 
   // Merge by timestamp so the client can stagger them by actual
   // wall-clock ordering without doing its own sort.
-  const taps = [...real, ...ambient].sort(
+  const taps = [...real, ...ambient, ...simulated].sort(
     (a, b) => a.createdAtMs - b.createdAtMs,
   );
 

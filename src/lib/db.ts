@@ -206,6 +206,11 @@ export function synthesizeAmbientTaps(
   sinceMs: number,
   nowMs: number,
 ): { country: string; createdAtMs: number }[] {
+  // When the simulator is on, the slow ambient cadence (one every 22s)
+  // is noise at that scale — suppress it so the globe reads as coming
+  // from one coherent source of fake traffic rather than two cadences
+  // fighting each other.
+  if (simulateQps() > 0) return [];
   if (!ambientEnabled(nowMs)) return [];
   const out: { country: string; createdAtMs: number }[] = [];
   // First cadence boundary strictly greater than sinceMs.
@@ -215,6 +220,63 @@ export function synthesizeAmbientTaps(
   while (t <= nowMs) {
     out.push({ country: ambientCountryAt(t), createdAtMs: t });
     t += AMBIENT_CADENCE_MS;
+  }
+  return out;
+}
+
+/**
+ * Simulated high-rate traffic. When WITNESS_SIMULATE_QPS=N is set, the
+ * witness endpoint pretends there are N taps per second coming in from
+ * around the world — a stand-in for the real audience we don't have
+ * yet. Used to preview what the "万家灯火" effect looks like at busy
+ * scale without waiting for organic traffic.
+ *
+ * Deterministic on wall-clock boundaries, same trick as
+ * synthesizeAmbientTaps: two overlapping polls return the same events
+ * with the same timestamps, so nothing is double-counted or dropped.
+ *
+ * Cap at 200 qps — at 50+ qps the globe is already reading as
+ * "constantly blooming everywhere," and anything above 200 just
+ * floods the client with setTimeouts without adding visible density.
+ * Zero or unset means the simulator is off (production default).
+ */
+function simulateQps(): number {
+  const raw = process.env.WITNESS_SIMULATE_QPS;
+  if (!raw) return 0;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(n, 200);
+}
+
+function simulatedCountryAt(boundaryMs: number): string {
+  // Same xorshift hash style as ambientCountryAt, with a different
+  // seed multiplier so the simulated stream doesn't visibly correlate
+  // with the ambient one (matters only if both are running — they
+  // don't in practice, but keeping them de-correlated is cheap).
+  let x = ((boundaryMs * 9973) ^ 0xdeadbeef) | 0;
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  const idx = Math.abs(x) % MOCK_COUNTRIES.length;
+  return MOCK_COUNTRIES[idx];
+}
+
+export function synthesizeSimulatedTaps(
+  sinceMs: number,
+  nowMs: number,
+): { country: string; createdAtMs: number }[] {
+  const qps = simulateQps();
+  if (qps <= 0) return [];
+  // 1000/qps gives the gap between adjacent synthetic events. At 50 qps
+  // that's 20ms — fine-grained enough that the client's stagger
+  // distributes them smoothly across the 4.5s blooming window.
+  const cadenceMs = 1000 / qps;
+  const out: { country: string; createdAtMs: number }[] = [];
+  // First boundary strictly greater than sinceMs, aligned to the grid.
+  let t = Math.floor(sinceMs / cadenceMs) * cadenceMs + cadenceMs;
+  while (t <= nowMs) {
+    out.push({ country: simulatedCountryAt(t), createdAtMs: t });
+    t += cadenceMs;
   }
   return out;
 }
