@@ -32,3 +32,36 @@ export function countryFromRequest(req: NextRequest): string | null {
   }
   return null;
 }
+
+/**
+ * Read approximate [lat, lon] from edge headers. Vercel and Cloudflare
+ * both expose city-granular geolocation at the edge — granular enough
+ * that a Bay Area user's dot lands in the Bay Area, not in NYC or
+ * "somewhere in the US."
+ *
+ * Returns null when no header is present (local dev, or deployments
+ * without an IP-geo provider). Callers should fall back to a
+ * country-level position in that case.
+ *
+ * We clamp to valid lat/lon ranges and reject non-numeric values rather
+ * than trust whatever a proxy might send, since this coordinate is
+ * rendered as a point on the globe.
+ */
+export function coordsFromRequest(
+  req: NextRequest,
+): [number, number] | null {
+  const h = req.headers;
+  const candidates: [string | null, string | null][] = [
+    [h.get("x-vercel-ip-latitude"), h.get("x-vercel-ip-longitude")],
+    [h.get("cf-iplatitude"), h.get("cf-iplongitude")],
+  ];
+  for (const [rawLat, rawLon] of candidates) {
+    if (!rawLat || !rawLon) continue;
+    const lat = parseFloat(rawLat);
+    const lon = parseFloat(rawLon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
+    return [lat, lon];
+  }
+  return null;
+}

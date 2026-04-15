@@ -24,6 +24,10 @@ type Phase = "loading" | "idle" | "dissolving" | "revealed";
 type TapResponse = {
   ok: boolean;
   country?: string | null;
+  /** Optional precise [lat, lon] from edge geoip. When present, the
+   *  primary point lands on the user's real metro instead of a
+   *  randomly-picked country hotspot. */
+  coords?: [number, number] | null;
   recent5m?: number;
   recentCountries?: string[];
 };
@@ -215,9 +219,11 @@ export default function Scene({ lang }: { lang: Lang }) {
         }
       }
 
+      const primaryPos = data.coords ?? null;
       setRitual({
         startAt,
         primaryCountry,
+        primaryPos,
         countries,
         snapMs: SNAP_MS,
         igniteMs: IGNITE_MS,
@@ -243,12 +249,15 @@ export default function Scene({ lang }: { lang: Lang }) {
         setRitual(null);
         const handoffAt = Date.now();
         if (primaryCountry) {
-          // Seed the home dot with the ritual's startAt (not the
-          // handoff moment). Earth uses seedFor(home.startAt, country)
-          // to pick the jittered land position; matching the ritual's
-          // seed guarantees the home dot lands on the exact same
-          // pixel the primary was lit on — no visible jump.
-          setHome({ country: primaryCountry, startAt: startAt });
+          // Carry the same primaryPos the ritual used, so the pinned
+          // home dot sits at the user's real metro. When coords
+          // aren't available, startAt + country is enough for Earth
+          // to reproduce the ritual's hotspot pick identically.
+          setHome({
+            country: primaryCountry,
+            startAt: startAt,
+            pos: primaryPos,
+          });
         }
         setWitnessActiveAt(handoffAt);
       }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS);

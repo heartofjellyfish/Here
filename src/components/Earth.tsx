@@ -25,6 +25,10 @@ import { COUNTRY_COORDS, POP_HOTSPOTS } from "@/lib/countries";
 export interface Ritual {
   startAt: number;
   primaryCountry: string | null;
+  /** Optional precise [lat, lon] for the primary tap, from edge
+   *  geoip. When present, overrides the hotspot-weighted jitter so
+   *  a Bay Area user's point actually lands in the Bay Area. */
+  primaryPos?: [number, number] | null;
   countries: string[];
   snapMs: number;
   igniteMs: number;
@@ -76,8 +80,14 @@ export interface Home {
   country: string;
   /** Wall-clock moment the home point was planted — used as the phase
    *  reference for the breathing pulse so the effect is stable
-   *  per-session instead of sync'd to epoch. */
+   *  per-session instead of sync'd to epoch. Also the seed for the
+   *  fallback hotspot jitter, so it matches the ritual primary when
+   *  no edge geoip coords were available. */
   startAt: number;
+  /** Optional precise [lat, lon] from edge geoip. When present, the
+   *  home dot's latitude comes from here instead of the country
+   *  hotspot fallback. */
+  pos?: [number, number] | null;
 }
 
 type Props = {
@@ -640,11 +650,17 @@ export default function Earth({
     const needs =
       !cur || cur.country !== home.country || cur.startAt !== home.startAt;
     if (needs && COUNTRY_COORDS[home.country]) {
+      // Prefer precise geoip coords; fall back to the same hotspot
+      // pick the ritual primary used, keyed on startAt so the seeds
+      // match.
       const seed = seedFor(home.startAt, home.country);
+      const pos: [number, number] = home.pos
+        ? home.pos
+        : findPopulationWeightedJitter(seed, home.country);
       homeRef.current = {
         country: home.country,
         startAt: home.startAt,
-        pos: findPopulationWeightedJitter(seed, home.country),
+        pos,
       };
     }
   } else {
@@ -673,14 +689,17 @@ export default function Earth({
     let rotPrimaryIdeal = rotStart;
 
     if (primary && COUNTRY_COORDS[primary]) {
-      // Use the same hotspot-aware placement as witnesses and the
-      // home dot, seeded by ritual.startAt so the primary's ritual
-      // position and the pinned home dot after fade land on the
-      // *exact same pixel* — no visible jump at the handoff.
-      const pj = findPopulationWeightedJitter(
-        seedFor(ritual.startAt, primary),
-        primary,
-      );
+      // Prefer precise edge geoip coords when we have them — a Bay
+      // Area user should see their dot in the Bay Area, not in NYC.
+      // Fall back to hotspot-weighted jitter, seeded by ritual.startAt
+      // so the ritual primary and the post-fade home dot land on the
+      // exact same pixel (same seed + same algorithm = same result).
+      const pj: [number, number] = ritual.primaryPos
+        ? ritual.primaryPos
+        : findPopulationWeightedJitter(
+            seedFor(ritual.startAt, primary),
+            primary,
+          );
       jPos.set(primary, pj);
       const w = latLonToVec(pj[0], pj[1]);
       const rotIdeal = Math.atan2(-w[0], w[2]);
@@ -1095,18 +1114,26 @@ export default function Earth({
       }
 
       // ------ home point ------
-      // The user's own tap, pinned. Warm amber (matches the ritual
-      // primary color) with a slow breathing pulse and a second, even
-      // slower halo shimmer — both are one Math.sin per frame each,
-      // so effectively free. Drawn after witnesses so it sits on top
-      // of any witness that happens to land in the same metro.
+      // The user's own tap, pinned to YOU — not to the globe surface.
+      // Latitude is preserved (a user in Sydney sees their dot in the
+      // southern hemisphere, a user in Oslo sees it up top), but the
+      // longitude is collapsed to the front meridian so the dot stays
+      // exactly where you last saw it during ignite, regardless of
+      // how the earth rotates underneath. Warm amber (matches the
+      // ritual primary) with a slow breathing pulse and an even
+      // slower halo shimmer. Two Math.sin per frame, free. Drawn
+      // after witnesses so it sits on top of any that land in the
+      // same spot.
       {
         const h = homeRef.current;
         if (h) {
-          const wv = latLonToVec(h.pos[0], h.pos[1]);
-          const x1 = wv[0] * cosR + wv[2] * sinR;
-          const y1 = wv[1];
-          const z1 = -wv[0] * sinR + wv[2] * cosR;
+          // Front-meridian projection: x1=0, y1=sin(lat), z1=cos(lat).
+          // Skips the rotation matrix entirely — only the tilt applies,
+          // so the dot rides the 18° tilt but never the spin.
+          const latR = (h.pos[0] * Math.PI) / 180;
+          const x1 = 0;
+          const y1 = Math.sin(latR);
+          const z1 = Math.cos(latR);
           const rx = x1 * COS_T - y1 * SIN_T;
           const ry = x1 * SIN_T + y1 * COS_T;
           const rz = z1;
@@ -1114,15 +1141,23 @@ export default function Earth({
             const sx = cx + R * rx;
             const sy = cy - R * ry;
             const limb = Math.max(0, rz);
-            // Breathing: 0.78..1.0 over ~4.2s. Slow enough to read as
-            // a heartbeat, not a blink. Phase referenced to startAt so
-            // two sessions don't sync up coincidentally — feels
-            // personal, not global.
+            // Heartbeat pulse. Two gaussians per beat — a sharp
+            // systolic "lub" at ~5% into the cycle, a softer
+            // diastolic "dub" at ~22%, then a long rest until the
+            // next beat. 72 bpm = 0.833s per cycle, ordinary resting
+            // heart rate. Two exp() calls per frame — cheap.
             const tSec = (realNow - h.startAt) / 1000;
-            const breath = 0.89 + 0.11 * Math.sin(tSec * 1.5);
-            // Halo shimmer: an even slower ±15% wiggle on the outer
-            // glow alpha, decoupled from the core pulse so the light
-            // doesn't read as a single on/off sine.
+            const BEAT_PERIOD = 60 / 72;
+            const phase = (tSec % BEAT_PERIOD) / BEAT_PERIOD;
+            const lub = Math.exp(-Math.pow((phase - 0.05) * 18, 2));
+            const dub = 0.55 * Math.exp(-Math.pow((phase - 0.22) * 22, 2));
+            const beat = Math.max(lub, dub);
+            // Baseline + heartbeat. Baseline keeps the dot visible
+            // between beats; the pulse rides on top. Range ~0.72..1.0.
+            const breath = 0.72 + 0.28 * beat;
+            // Halo shimmer: a very slow breathing on the outer glow,
+            // decoupled from the beat — skin glow vs. pulse. Keeps
+            // the dot from reading as a purely binary on/off.
             const shimmer = 0.85 + 0.15 * Math.sin(tSec * 0.47 + 1.3);
             const intensity = breath * (0.55 + 0.45 * limb);
 
