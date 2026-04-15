@@ -35,7 +35,6 @@ const ROTATION_SETTLE_MS = 1400;
 
 export default function Scene({ lang }: { lang: Lang }) {
   const [phase, setPhase] = useState<Phase>("loading");
-  const [recent5m, setRecent5m] = useState(0);
   const [highlights, setHighlights] = useState<EarthHighlight[]>([]);
   // Earth canvas size — picked once at mount from viewport width so it
   // never overflows on narrow phones. Includes margin for the moon orbit.
@@ -72,7 +71,6 @@ export default function Scene({ lang }: { lang: Lang }) {
         const res = await fetch("/api/presence", { cache: "no-store" });
         const data = (await res.json()) as TapResponse;
         if (cancelled) return;
-        if (typeof data.recent5m === "number") setRecent5m(data.recent5m);
         if (Array.isArray(data.recentCountries)) {
           setHighlights((prev) => {
             const primary = prev.find((h) => h.primary);
@@ -132,8 +130,6 @@ export default function Scene({ lang }: { lang: Lang }) {
     setTimeout(async () => {
       const data = await tapPromise;
 
-      if (typeof data.recent5m === "number") setRecent5m(data.recent5m);
-
       const next: EarthHighlight[] = [];
       const now = Date.now();
 
@@ -162,7 +158,6 @@ export default function Scene({ lang }: { lang: Lang }) {
     }, DISSOLVE_MS);
   }
 
-  const presence = recent5m > 0 ? copy.presenceFmt(recent5m) : "";
   const stagger = phraseIsStaggered(lang);
 
   return (
@@ -209,8 +204,6 @@ export default function Scene({ lang }: { lang: Lang }) {
 
         <div className="reveal" role="status" aria-live="polite">
           <p className="reveal__ack">{copy.ack}</p>
-          <p className="reveal__resonance">{copy.resonance}</p>
-          <p className="reveal__presence">{presence || "\u00A0"}</p>
         </div>
       </main>
       <Grain />

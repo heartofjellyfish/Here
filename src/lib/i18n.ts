@@ -23,82 +23,20 @@ export const COPY: Record<
   {
     phrase: string;
     ack: string;
-    resonance: string;
-    presenceFmt: (n: number) => string;
   }
 > = {
-  zh: {
-    phrase: "我累了",
-    ack: "此刻，也有人这样。",
-    resonance: "每晚 9 点，这里会更近一点。",
-    presenceFmt: (n) => `· 过去五分钟，还有 ${n} 个人 ·`,
-  },
-  en: {
-    phrase: "I'm tired.",
-    ack: "Someone else is, right now.",
-    resonance: "At 9 each night, it feels a little closer here.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "other" : "others"} in the last five minutes ·`,
-  },
-  ja: {
-    phrase: "疲れた。",
-    ack: "いま、同じ気持ちの人がいます。",
-    resonance: "毎晩 9 時、ここは少し近くなります。",
-    presenceFmt: (n) => `· この 5 分間に ${n} 人 ·`,
-  },
-  ko: {
-    phrase: "지쳤어.",
-    ack: "지금, 누군가도 그래요.",
-    resonance: "매일 밤 9시, 여기는 조금 더 가까워져요.",
-    presenceFmt: (n) => `· 지난 5분간 ${n}명 ·`,
-  },
-  es: {
-    phrase: "Estoy cansado.",
-    ack: "Alguien más también, ahora mismo.",
-    resonance: "A las 9 cada noche, aquí se siente un poco más cerca.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "persona" : "personas"} en los últimos cinco minutos ·`,
-  },
-  fr: {
-    phrase: "Je suis fatigué.",
-    ack: "Quelqu'un d'autre aussi, en ce moment.",
-    resonance: "Chaque soir à 21 h, on se sent un peu plus proche ici.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "personne" : "personnes"} dans les cinq dernières minutes ·`,
-  },
-  de: {
-    phrase: "Ich bin müde.",
-    ack: "Gerade jetzt geht es jemandem auch so.",
-    resonance: "Jeden Abend um 21 Uhr fühlt es sich hier ein wenig näher an.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "Person" : "Menschen"} in den letzten fünf Minuten ·`,
-  },
-  pt: {
-    phrase: "Estou cansado.",
-    ack: "Mais alguém também, agora.",
-    resonance: "Às 9 da noite, aqui parece um pouco mais próximo.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "pessoa" : "pessoas"} nos últimos cinco minutos ·`,
-  },
-  ru: {
-    phrase: "Я устал.",
-    ack: "Кто-то ещё — прямо сейчас.",
-    resonance: "Каждый вечер в 9, здесь становится чуть ближе.",
-    presenceFmt: (n) => `· ${n} за последние пять минут ·`,
-  },
-  it: {
-    phrase: "Sono stanco.",
-    ack: "In questo momento, qualcun altro anche.",
-    resonance: "Ogni sera alle 9, qui sembra un po' più vicino.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "persona" : "persone"} negli ultimi cinque minuti ·`,
-  },
-  nl: {
-    phrase: "Ik ben moe.",
-    ack: "Iemand anders ook, op dit moment.",
-    resonance: "Elke avond om 9 voelt het hier iets dichterbij.",
-    presenceFmt: (n) => `· ${n} ${n === 1 ? "ander" : "anderen"} in de laatste vijf minuten ·`,
-  },
-  ar: {
-    phrase: "أنا متعب.",
-    ack: "شخص آخر يشعر بذلك، الآن.",
-    resonance: "كلّ ليلة عند التاسعة، يصبح الجوّ هنا أقرب قليلاً.",
-    presenceFmt: (n) => `· ${n} في آخر خمس دقائق ·`,
-  },
+  zh: { phrase: "我累了", ack: "你不是一个人。" },
+  en: { phrase: "I'm tired.", ack: "You're not alone." },
+  ja: { phrase: "疲れた。", ack: "ひとりじゃない。" },
+  ko: { phrase: "지쳤어.", ack: "혼자가 아니에요." },
+  es: { phrase: "Estoy cansado.", ack: "No estás solo." },
+  fr: { phrase: "Je suis fatigué.", ack: "Tu n'es pas seul." },
+  de: { phrase: "Ich bin müde.", ack: "Du bist nicht allein." },
+  pt: { phrase: "Estou cansado.", ack: "Você não está sozinho." },
+  ru: { phrase: "Я устал.", ack: "Ты не один." },
+  it: { phrase: "Sono stanco.", ack: "Non sei solo." },
+  nl: { phrase: "Ik ben moe.", ack: "Je bent niet alleen." },
+  ar: { phrase: "أنا متعب.", ack: "لست وحدك." },
 };
 
 // Accept-Language primary → Lang.
