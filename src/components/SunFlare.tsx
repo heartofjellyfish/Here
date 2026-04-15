@@ -61,12 +61,11 @@ const SUN_CYCLE_MS = 153_000;
 // which felt like it overstayed.
 const FLARE_WINDOW_START = 9;
 const FLARE_WINDOW_PEAK = 46;  // matches the sun's zenith in SUN_WAYPOINTS
-// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 53 → 7% past peak
-// → ~10.7s of fade past zenith (effectively "11s past peak"). Tuned
-// up from earlier values that all felt too short; at 11s the fall
-// has proper room to breathe, still well short of the original 82
-// (which lingered ~55s into the sun's descent).
-const FLARE_WINDOW_END = 53;
+// 1% of a 153s cycle ≈ 1.53s. FLARE_WINDOW_END = 55 → 9% past peak
+// → ~13.8s of fade past zenith (effectively "14s past peak"). Well
+// short of the original 82 (which lingered ~55s into the sun's
+// descent) but generous enough that the fall doesn't feel clipped.
+const FLARE_WINDOW_END = 55;
 
 type GhostKind = "glint" | "disc" | "ring" | "anchor";
 type GhostDef = {
