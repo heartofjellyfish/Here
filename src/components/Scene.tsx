@@ -11,6 +11,7 @@ import Starfield from "./Starfield";
 import SunFlare from "./SunFlare";
 import TapButton from "./TapButton";
 import Grain from "./Grain";
+import BackgroundMusic from "./BackgroundMusic";
 import {
   COPY,
   isRTL,
@@ -450,6 +451,7 @@ export default function Scene({ lang }: { lang: Lang }) {
         </div>
       </main>
       <Grain />
+      <BackgroundMusic play={phase === "dissolving" || phase === "revealed"} />
     </>
   );
 }

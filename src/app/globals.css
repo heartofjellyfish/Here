@@ -1073,3 +1073,67 @@ body {
     transition-delay: 0ms;
   }
 }
+
+/* ---------- Music toggle ---------- */
+/* Appears once the user has tapped (the gesture that unlocks audio).
+   Top-right corner, small, semi-transparent — a control, not a feature.
+   Fades in gently so it doesn't pop into view the moment the ritual
+   starts; by the time it's fully visible the user is settling into
+   witness mode and might want it. */
+
+.music-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 20;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(14, 16, 22, 0.42);
+  border: 1px solid rgba(212, 218, 226, 0.12);
+  border-radius: 50%;
+  color: rgba(212, 218, 226, 0.55);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition:
+    color 240ms ease,
+    background 240ms ease,
+    border-color 240ms ease,
+    transform 240ms ease;
+  opacity: 0;
+  animation: music-toggle-in 1200ms ease 1200ms forwards;
+}
+
+.music-toggle:hover {
+  color: rgba(232, 236, 242, 0.92);
+  background: rgba(20, 22, 30, 0.6);
+  border-color: rgba(212, 218, 226, 0.22);
+}
+
+.music-toggle:focus-visible {
+  outline: 2px solid rgba(212, 218, 226, 0.4);
+  outline-offset: 2px;
+}
+
+.music-toggle:active {
+  transform: scale(0.94);
+}
+
+@keyframes music-toggle-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .music-toggle {
+    animation: none;
+    opacity: 1;
+    transition: none;
+  }
+}
+
