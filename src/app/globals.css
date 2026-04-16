@@ -1100,7 +1100,7 @@ body {
     color 320ms ease,
     transform 240ms ease;
   opacity: 0;
-  animation: music-toggle-in 1600ms ease 1400ms forwards;
+  animation: music-toggle-in 2200ms ease 1400ms forwards;
 }
 
 .music-toggle:hover {
@@ -1116,9 +1116,32 @@ body {
   transform: scale(0.92);
 }
 
+/* Brief starburst: the icon flares warm like a star igniting, holds
+   for a beat so the eye finds it, then dims to its ghost state. The
+   peak coincides roughly with the wisp landing on the earth — the ♪
+   dissolves out of the button, a star twinkles into the corner.
+   drop-shadow works on SVG children (text-shadow would not). */
 @keyframes music-toggle-in {
-  to {
+  0% {
+    opacity: 0;
+    color: rgba(212, 218, 226, 0.32);
+    filter: none;
+  }
+  40% {
     opacity: 1;
+    color: rgba(255, 248, 230, 0.95);
+    filter: drop-shadow(0 0 6px rgba(255, 248, 230, 0.7))
+            drop-shadow(0 0 16px rgba(255, 248, 230, 0.25));
+  }
+  60% {
+    opacity: 1;
+    color: rgba(255, 248, 230, 0.6);
+    filter: drop-shadow(0 0 3px rgba(255, 248, 230, 0.3));
+  }
+  100% {
+    opacity: 1;
+    color: rgba(212, 218, 226, 0.32);
+    filter: none;
   }
 }
 

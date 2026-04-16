@@ -25,7 +25,7 @@ export default function TapButton({ onTap, disabled }: Props) {
       disabled={disabled}
       aria-label="+1"
     >
-      <span className="tap__glyph">+1</span>
+      <span className="tap__glyph">+{pressed ? "♪" : "1"}</span>
       <span className="tap__ripple" aria-hidden="true" />
     </button>
   );
