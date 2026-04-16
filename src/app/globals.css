@@ -1145,11 +1145,78 @@ body {
   }
 }
 
+/* Cross-shaped diffraction spikes — two 1px bars (vertical + horizontal)
+   that extend outward from the icon and collapse. Tips fade via gradient
+   so the rays read as light, not geometry. The horizontal ray arrives
+   100ms after the vertical so the cross assembles with a hint of life
+   instead of a mechanical simultaneous pop. */
+.music-toggle::before,
+.music-toggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 1px;
+}
+.music-toggle::before {
+  width: 1px;
+  height: 54px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 248, 230, 0.85) 38%,
+    rgba(255, 248, 230, 0.85) 62%,
+    transparent
+  );
+  animation: star-ray 2200ms ease 1400ms forwards;
+}
+.music-toggle::after {
+  width: 54px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 248, 230, 0.85) 38%,
+    rgba(255, 248, 230, 0.85) 62%,
+    transparent
+  );
+  animation: star-ray 2200ms ease 1500ms forwards;
+}
+
+@keyframes star-ray {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  35% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  55% {
+    opacity: 0.35;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  80% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .music-toggle {
     animation: none;
     opacity: 1;
     transition: none;
+  }
+  .music-toggle::before,
+  .music-toggle::after {
+    animation: none;
   }
 }
 
