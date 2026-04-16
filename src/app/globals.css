@@ -281,16 +281,18 @@ body {
      (255, 250, 230) so it reads as hot; the outer rings pull toward
      amber (255, 165, 105) so the halo reads as atmospheric haze
      rather than flat tint. */
+  /* 4-stop gradient. Each stop is a slope discontinuity the eye can
+     perceive as a ring when blur isn't enough to smooth it. Fewer
+     stops = fewer potential rings. Slopes chosen to decrease
+     gradually (-0.014 → -0.0088 → -0.0047 → -0.0024 alpha/%), so
+     each kink is smaller than the previous — the transitions blend
+     into each other instead of standing out. */
   background: radial-gradient(
     closest-side,
-    rgba(255, 250, 230, 0.72) 0%,
-    rgba(255, 247, 220, 0.64) 10%,
-    rgba(255, 240, 200, 0.52) 22%,
-    rgba(255, 228, 175, 0.38) 36%,
-    rgba(255, 215, 155, 0.24) 52%,
-    rgba(255, 200, 140, 0.13) 68%,
-    rgba(255, 185, 125, 0.06) 82%,
-    rgba(255, 175, 115, 0.02) 92%,
+    rgba(255, 248, 225, 0.7) 0%,
+    rgba(255, 232, 190, 0.42) 20%,
+    rgba(255, 215, 160, 0.2) 45%,
+    rgba(255, 195, 135, 0.06) 75%,
     transparent 100%
   );
   opacity: 0;
@@ -601,14 +603,7 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 5;
-  /* Lifted from 0.05 → 0.10 to dither the sun-glow's radial gradient
-     banding. At 0.05 the noise was too faint to hide the concentric
-     rings visible during sunrise/sunset (low element opacity +
-     8-bit alpha quantization). 0.10 leans into the film-grain
-     aesthetic the app already has, kills the banding, and stays
-     well below the "noisy" threshold on solid black. Zero runtime
-     cost — grain is a static SVG rasterized once at load. */
-  opacity: 0.1;
+  opacity: 0.05;
   mix-blend-mode: overlay;
 }
 .grain svg {
