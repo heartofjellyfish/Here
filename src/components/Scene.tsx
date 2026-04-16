@@ -56,13 +56,26 @@ const WITNESS_JITTER_MS = 600;
 // Per-bloom lifecycle defaults. Each bloom rises to full brightness,
 // holds, then fades. Overridable via ?rise=&hold=&fade= URL params
 // (values in seconds) — lets us preview "stays lit longer" or "quick
-// glints" without code changes. Defaults match the hand-tuned values
-// the ritual was designed around.
+// glints" without code changes.
+//
+// Tuned (with sim=200 baseline) for "万家灯火此消彼长" — a busy globe
+// where lights twinkle in and out fast enough that the eye reads
+// motion and aliveness rather than a static constellation. Long
+// rise/hold/fade saturated the globe under any non-trivial traffic;
+// these short values keep the canvas breathing.
 const DEFAULT_TIMING: WitnessTiming = {
-  riseMs: 1500,
-  holdMs: 6000,
-  fadeMs: 20000,
+  riseMs: 500,
+  holdMs: 1000,
+  fadeMs: 500,
 };
+
+// Default synthetic tap rate. The witness API also supports an env-var
+// ambient rate on the server, but that's tuned slow for "quiet day"
+// realism; this client default is what most visitors actually want to
+// see — a populated globe from the moment witness mode begins, not a
+// blank one waiting for organic traffic. Override with ?sim=0 to see
+// only real taps, or ?sim=N for a different rate.
+const DEFAULT_SIM_QPS = "200";
 
 function lifetimeOf(t: WitnessTiming): number {
   return t.riseMs + t.holdMs + t.fadeMs;
@@ -113,27 +126,28 @@ export default function Scene({ lang }: { lang: Lang }) {
   const phraseRef = useRef<HTMLHeadingElement>(null);
   const tapWrapRef = useRef<HTMLDivElement>(null);
 
-  // URL-driven preview knobs. Parsed once at mount via lazy state init
-  // so there's no hydration flicker and no re-render storm from param
+  // URL-driven overrides. Parsed once at mount via lazy state init so
+  // there's no hydration flicker and no re-render storm from param
   // changes (they can't change at runtime anyway — it's URL-on-load).
   //
   // Supported params:
-  //   ?sim=N     — pretend N synthetic taps/sec are coming in (0-200)
+  //   ?sim=N     — synthetic taps/sec (default 200; ?sim=0 disables)
   //   ?rise=S    — per-bloom rise seconds
   //   ?hold=S    — per-bloom hold-at-full seconds
   //   ?fade=S    — per-bloom fade seconds
   //
-  // Defaults produce the intended poetic pace for organic traffic.
-  // For busy simulation (sim=50+), try something shorter so the
-  // globe twinkles instead of saturating, e.g. hold=1&fade=3.
+  // Defaults are tuned for the intended "万家灯火此消彼长" — a busy,
+  // twinkling globe. To preview the slower contemplative version
+  // (longer-lived blooms, sparser activity), try
+  // ?sim=10&rise=1.5&hold=6&fade=20.
   const [cfg] = useState<{ simQps: string | null; timing: WitnessTiming }>(
     () => {
       if (typeof window === "undefined") {
-        return { simQps: null, timing: { ...DEFAULT_TIMING } };
+        return { simQps: DEFAULT_SIM_QPS, timing: { ...DEFAULT_TIMING } };
       }
       const p = new URLSearchParams(window.location.search);
       const sim = p.get("sim");
-      const simQps = sim && /^\d+$/.test(sim) ? sim : null;
+      const simQps = sim && /^\d+$/.test(sim) ? sim : DEFAULT_SIM_QPS;
       const readSec = (key: string, defMs: number) => {
         const v = p.get(key);
         if (v == null) return defMs;
