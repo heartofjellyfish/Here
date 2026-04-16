@@ -121,6 +121,10 @@ export default function Scene({ lang }: { lang: Lang }) {
   // Earth canvas size — picked once at mount from viewport width so it
   // never overflows on narrow phones. Includes margin for the moon orbit.
   const [earthSize, setEarthSize] = useState(340);
+  // After the reveal text has been shown, the earth slides to viewport
+  // center for witness mode. This flag triggers both the text fade-out
+  // and the earth centering transition.
+  const [centered, setCentered] = useState(false);
 
   const earthRef = useRef<HTMLDivElement>(null);
   const phraseRef = useRef<HTMLHeadingElement>(null);
@@ -178,6 +182,21 @@ export default function Scene({ lang }: { lang: Lang }) {
     const t = setTimeout(() => setPhase("idle"), 600);
     return () => clearTimeout(t);
   }, []);
+
+  // Slide the earth to viewport center once the reveal text has had
+  // its moment. The sun's zenith is also at viewport center (see
+  // SunFlare.tsx), so when the sun passes overhead the ghost chain
+  // converges on the globe — physically correct "合二为一".
+  useEffect(() => {
+    if (!centered) return;
+    const el = earthRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cy = rect.top + rect.height / 2;
+    const offsetPx = window.innerHeight / 2 - cy;
+    el.style.transition = "transform 2.5s cubic-bezier(0.25, 0, 0.15, 1)";
+    el.style.transform = `translateY(${offsetPx}px)`;
+  }, [centered]);
 
   // Pick a comfortable earth size: ~80% of the viewport's shortest side,
   // capped so it doesn't dominate larger screens.
@@ -275,6 +294,10 @@ export default function Scene({ lang }: { lang: Lang }) {
           });
         }
         setWitnessActiveAt(handoffAt);
+
+        // After the reveal text has been visible for a beat, fade it
+        // out and slide the earth to viewport center for witness mode.
+        setTimeout(() => setCentered(true), 3000);
       }, SNAP_MS + IGNITE_MS + SWEEP_MS + FLASH_MS + FADE_MS);
     }, DISSOLVE_MS);
   }
@@ -414,7 +437,7 @@ export default function Scene({ lang }: { lang: Lang }) {
     <>
       <Starfield flashAt={flashAt} earthSize={earthSize} />
       <SunFlare />
-      <main className={`stage stage--${phase} ${fontClass}`} dir={dir}>
+      <main className={`stage stage--${phase}${centered ? " stage--centered" : ""} ${fontClass}`} dir={dir}>
         <div ref={earthRef} className="earth-wrap">
           <Earth
             size={earthSize}

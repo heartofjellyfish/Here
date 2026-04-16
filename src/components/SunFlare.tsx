@@ -200,11 +200,6 @@ export default function SunFlare() {
   const waypointsRef = useRef<number[][]>(
     BASE_WAYPOINTS.map((w) => [w[0], w[1], w[2], w[3]]),
   );
-  // Earth's natural Y offset from viewport center (in vh). Measured
-  // at mount; used to compute how far the earth needs to slide to
-  // reach viewport center at peak.
-  const earthNaturalYRef = useRef(-13);
-
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
     // moving bright artifacts is exactly the kind of thing that
@@ -216,31 +211,15 @@ export default function SunFlare() {
       return;
     }
 
-    // Measure the earth's natural position and shift the sun arc so
-    // its zenith lands at VIEWPORT CENTER (0, 0). The earth will
-    // slide down to meet the sun there at peak (see pull logic in
-    // tick). This keeps the optical center at viewport center — the
-    // physically correct spot — while achieving ghost convergence on
-    // the earth at peak.
-    function patchZenith() {
-      const el = document.querySelector(".earth-wrap");
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const cy = rect.top + rect.height / 2;
-      const vh = window.innerHeight;
-      earthNaturalYRef.current = ((cy / vh) - 0.5) * 100;
-      // Shift arc so zenith = viewport center (Y=0).
-      const originalZenithY = BASE_WAYPOINTS[8][2]; // -13
-      const delta = 0 - originalZenithY;
-      for (let i = 0; i < waypointsRef.current.length; i++) {
-        waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
-      }
+    // Shift the sun arc so its zenith lands at viewport center (Y=0).
+    // The earth slides there on tap (see Scene.tsx), so at zenith
+    // sun = earth = optical center → ghost chain converges on the
+    // globe with physically correct optics.
+    const originalZenithY = BASE_WAYPOINTS[8][2]; // -13
+    const delta = 0 - originalZenithY;
+    for (let i = 0; i < waypointsRef.current.length; i++) {
+      waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
     }
-    // Delay initial measurement: Scene's earthSize effect triggers a
-    // re-render after mount, so the earth-wrap hasn't settled yet at
-    // the first paint. Two rAFs guarantees we measure after layout.
-    requestAnimationFrame(() => requestAnimationFrame(patchZenith));
-    window.addEventListener("resize", patchZenith);
 
     let raf = 0;
 
@@ -545,32 +524,12 @@ export default function SunFlare() {
         godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
       }
 
-      // --- Earth pull ---
-      // As the sun approaches zenith (viewport center), the earth
-      // slides down from its natural layout position to meet it.
-      // At peak the three converge: sun = earth = optical center.
-      // After peak the earth drifts back. pow(envelope, 2.5)
-      // makes the pull barely noticeable early in the rise and
-      // strongly peaked at zenith — reads as gravitational.
-      const earthEl = document.querySelector<HTMLElement>(".earth-wrap");
-      if (earthEl) {
-        const pullFactor = Math.pow(envelope, 2.5);
-        // earthNaturalYRef.current is negative (earth above center).
-        // Negate it to get a positive downward shift toward 0 (center).
-        const pullVh = -earthNaturalYRef.current * pullFactor;
-        earthEl.style.transform = `translateY(${pullVh.toFixed(2)}vh)`;
-      }
-
       raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", patchZenith);
-      // Reset earth position on unmount.
-      const earthEl = document.querySelector<HTMLElement>(".earth-wrap");
-      if (earthEl) earthEl.style.transform = "";
     };
   }, []);
 

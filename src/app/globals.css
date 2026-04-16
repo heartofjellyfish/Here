@@ -915,6 +915,15 @@ body {
   transform: none;
   transition-delay: 9800ms;
 }
+
+/* After the reveal text has had its moment, fade it out and let
+   the earth take center stage for witness mode. */
+.stage--centered .reveal__ack,
+.stage--centered .reveal__coda {
+  opacity: 0;
+  transition: opacity 2s ease;
+  transition-delay: 0ms;
+}
 .stage--revealed .reveal__resonance {
   opacity: 1;
   transform: none;
