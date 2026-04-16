@@ -601,7 +601,14 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 5;
-  opacity: 0.05;
+  /* Lifted from 0.05 → 0.10 to dither the sun-glow's radial gradient
+     banding. At 0.05 the noise was too faint to hide the concentric
+     rings visible during sunrise/sunset (low element opacity +
+     8-bit alpha quantization). 0.10 leans into the film-grain
+     aesthetic the app already has, kills the banding, and stays
+     well below the "noisy" threshold on solid black. Zero runtime
+     cost — grain is a static SVG rasterized once at load. */
+  opacity: 0.1;
   mix-blend-mode: overlay;
 }
 .grain svg {
