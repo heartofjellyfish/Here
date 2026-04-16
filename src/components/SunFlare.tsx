@@ -200,9 +200,10 @@ export default function SunFlare() {
   const waypointsRef = useRef<number[][]>(
     BASE_WAYPOINTS.map((w) => [w[0], w[1], w[2], w[3]]),
   );
-  // Earth center in vw/vh from viewport center. Used as the flare's
-  // optical center so ghosts converge on the earth at peak.
-  const earthOffsetRef = useRef({ x: 0, y: -13 });
+  // Earth's natural Y offset from viewport center (in vh). Measured
+  // at mount; used to compute how far the earth needs to slide to
+  // reach viewport center at peak.
+  const earthNaturalYRef = useRef(-13);
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -215,23 +216,22 @@ export default function SunFlare() {
       return;
     }
 
-    // Measure the earth's center and shift the ENTIRE arc vertically
-    // so the zenith lands on the globe's center. We compute the delta
-    // between the original zenith Y (-13vh from viewport center) and
-    // the earth's measured center, then apply that delta to every
-    // waypoint. This keeps the arc's shape intact while raising or
-    // lowering it as a whole — sunrise and sunset shift by the same
-    // amount, so the parabola stays smooth.
+    // Measure the earth's natural position and shift the sun arc so
+    // its zenith lands at VIEWPORT CENTER (0, 0). The earth will
+    // slide down to meet the sun there at peak (see pull logic in
+    // tick). This keeps the optical center at viewport center — the
+    // physically correct spot — while achieving ghost convergence on
+    // the earth at peak.
     function patchZenith() {
       const el = document.querySelector(".earth-wrap");
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const cy = rect.top + rect.height / 2;
       const vh = window.innerHeight;
-      const earthVh = ((cy / vh) - 0.5) * 100; // earth center in vh from viewport center
-      earthOffsetRef.current = { x: 0, y: earthVh };
+      earthNaturalYRef.current = ((cy / vh) - 0.5) * 100;
+      // Shift arc so zenith = viewport center (Y=0).
       const originalZenithY = BASE_WAYPOINTS[8][2]; // -13
-      const delta = earthVh - originalZenithY;
+      const delta = 0 - originalZenithY;
       for (let i = 0; i < waypointsRef.current.length; i++) {
         waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
       }
@@ -301,16 +301,12 @@ export default function SunFlare() {
         }
       }
 
-      // --- Optical center ---
-      // The flare's optical center sits on the EARTH, not the
-      // viewport center. This way all ghosts converge on the globe
-      // at zenith — the biggest ring wraps the earth instead of
-      // floating on the opposite side of the screen. A small
-      // breath-like drift is added so the center isn't perfectly
-      // rigid.
-      const eo = earthOffsetRef.current;
-      const ocX = eo.x + 1.5 * Math.sin(now * 0.00022);
-      const ocY = eo.y + 0.8 * Math.sin(now * 0.00015 + 1.3);
+      // --- Camera drift (optical center) ---
+      // The optical center is at viewport center — physically
+      // correct for lens flare. Small breath-like drift so it
+      // isn't perfectly rigid.
+      const camX = 1.5 * Math.sin(now * 0.00022);
+      const camY = 0.8 * Math.sin(now * 0.00015 + 1.3);
 
       // Sun position (absolute, in vw/vh from viewport center).
       const [rawSx, rawSy, sunAlpha] = sunPosAt(cyclePct, wps);
@@ -329,9 +325,9 @@ export default function SunFlare() {
         ).toFixed(3);
       }
 
-      // Sun relative to the optical center (earth).
-      const sx = rawSx - ocX;
-      const sy = rawSy - ocY;
+      // Sun relative to the optical center (viewport center + drift).
+      const sx = rawSx - camX;
+      const sy = rawSy - camY;
       const dist = Math.hypot(sx, sy);
 
       // Defocus growth: when the sun is near the optical axis, each
@@ -368,15 +364,15 @@ export default function SunFlare() {
         if (!el) continue;
 
         // Ghost position = opticalCenter + t · (sun - opticalCenter).
-        // With the optical center at (ocX, ocY) (earth + drift), this
+        // With the optical center drifting as (camX, camY), this
         // expands to camCoord · (1 - t) + t · sunCoord — meaning
         // far-from-center ghosts parallax *more* than near ones,
         // which is exactly what real off-axis elements do.
         // perpOffset is applied along the true perpendicular to the
         // axis (see sunLen / perpUnit calc above) so the chain stays
         // on-axis as the sun moves.
-        const gx = ocX * (1 - g.t) + g.t * rawSx + g.perpOffset * perpUnitX;
-        const gy = ocY * (1 - g.t) + g.t * rawSy + g.perpOffset * perpUnitY;
+        const gx = camX * (1 - g.t) + g.t * rawSx + g.perpOffset * perpUnitX;
+        const gy = camY * (1 - g.t) + g.t * rawSy + g.perpOffset * perpUnitY;
 
         // Size driven by three sources so the chain doesn't inflate
         // in lockstep:
@@ -549,6 +545,22 @@ export default function SunFlare() {
         godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
       }
 
+      // --- Earth pull ---
+      // As the sun approaches zenith (viewport center), the earth
+      // slides down from its natural layout position to meet it.
+      // At peak the three converge: sun = earth = optical center.
+      // After peak the earth drifts back. pow(envelope, 2.5)
+      // makes the pull barely noticeable early in the rise and
+      // strongly peaked at zenith — reads as gravitational.
+      const earthEl = document.querySelector<HTMLElement>(".earth-wrap");
+      if (earthEl) {
+        const pullFactor = Math.pow(envelope, 2.5);
+        // earthNaturalYRef.current is negative (earth above center).
+        // Negate it to get a positive downward shift toward 0 (center).
+        const pullVh = -earthNaturalYRef.current * pullFactor;
+        earthEl.style.transform = `translateY(${pullVh.toFixed(2)}vh)`;
+      }
+
       raf = requestAnimationFrame(tick);
     };
 
@@ -556,6 +568,9 @@ export default function SunFlare() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", patchZenith);
+      // Reset earth position on unmount.
+      const earthEl = document.querySelector<HTMLElement>(".earth-wrap");
+      if (earthEl) earthEl.style.transform = "";
     };
   }, []);
 
