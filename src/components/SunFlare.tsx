@@ -579,10 +579,22 @@ export default function SunFlare() {
       // sun aligning with the lens" — a pure cinematic moment marker.
       // Sigma ~1.4% cycle → ~2.1s half-life, so the flash is felt as
       // a punctuation point rather than a sustained white wash.
+      //
+      // PERF: both flash and tint are full-viewport layers. Even at
+      // opacity 0 they sit in the compositor tree — tint's soft-light
+      // blend forces the GPU to re-blend the entire frame every tick.
+      // So we display:none them outside the active window and only
+      // promote when there's a visible contribution. Active window:
+      // flash |d| < 5% cycle, tint |d| < 20% cycle.
       if (peakFlashRef.current) {
         const dPct = cyclePct - FLARE_WINDOW_PEAK;
-        const flashEnv = Math.exp(-(dPct * dPct) / 4);
-        peakFlashRef.current.style.opacity = (flashEnv * 0.10).toFixed(3);
+        if (Math.abs(dPct) > 5) {
+          peakFlashRef.current.style.display = "none";
+        } else {
+          peakFlashRef.current.style.display = "block";
+          const flashEnv = Math.exp(-(dPct * dPct) / 4);
+          peakFlashRef.current.style.opacity = (flashEnv * 0.10).toFixed(3);
+        }
       }
 
       // --- Peak tint (color grade) ---
@@ -593,8 +605,13 @@ export default function SunFlare() {
       // obvious filter.
       if (peakTintRef.current) {
         const dPct = cyclePct - FLARE_WINDOW_PEAK;
-        const tintEnv = Math.exp(-(dPct * dPct) / 60);
-        peakTintRef.current.style.opacity = (tintEnv * 0.55).toFixed(3);
+        if (Math.abs(dPct) > 20) {
+          peakTintRef.current.style.display = "none";
+        } else {
+          peakTintRef.current.style.display = "block";
+          const tintEnv = Math.exp(-(dPct * dPct) / 60);
+          peakTintRef.current.style.opacity = (tintEnv * 0.55).toFixed(3);
+        }
       }
 
       raf = requestAnimationFrame(tick);
