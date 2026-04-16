@@ -200,6 +200,9 @@ export default function SunFlare() {
   const waypointsRef = useRef<number[][]>(
     BASE_WAYPOINTS.map((w) => [w[0], w[1], w[2], w[3]]),
   );
+  // Earth center in vw/vh from viewport center. Used as the flare's
+  // optical center so ghosts converge on the earth at peak.
+  const earthOffsetRef = useRef({ x: 0, y: -13 });
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -226,13 +229,17 @@ export default function SunFlare() {
       const cy = rect.top + rect.height / 2;
       const vh = window.innerHeight;
       const earthVh = ((cy / vh) - 0.5) * 100; // earth center in vh from viewport center
+      earthOffsetRef.current = { x: 0, y: earthVh };
       const originalZenithY = BASE_WAYPOINTS[8][2]; // -13
       const delta = earthVh - originalZenithY;
       for (let i = 0; i < waypointsRef.current.length; i++) {
         waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
       }
     }
-    patchZenith();
+    // Delay initial measurement: Scene's earthSize effect triggers a
+    // re-render after mount, so the earth-wrap hasn't settled yet at
+    // the first paint. Two rAFs guarantees we measure after layout.
+    requestAnimationFrame(() => requestAnimationFrame(patchZenith));
     window.addEventListener("resize", patchZenith);
 
     let raf = 0;
@@ -294,21 +301,18 @@ export default function SunFlare() {
         }
       }
 
-      // --- Camera drift ---
-      // Two independent slow sine waves on X and Y with different
-      // periods so the motion never closes into a circle — reads
-      // as breath, not orbit. Amplitudes intentionally small: we
-      // want the optical center to feel *unfixed* without the
-      // earth or phrase appearing to move. This shifts only the
-      // flare's reference point, not the scene itself — a real
-      // camera move would translate everything, but moving the
-      // earth competes with the emotional focus. Treat it as the
-      // lens elements shifting slightly within a fixed body.
-      const camX = 1.5 * Math.sin(now * 0.00022);
-      const camY = 0.8 * Math.sin(now * 0.00015 + 1.3);
+      // --- Optical center ---
+      // The flare's optical center sits on the EARTH, not the
+      // viewport center. This way all ghosts converge on the globe
+      // at zenith — the biggest ring wraps the earth instead of
+      // floating on the opposite side of the screen. A small
+      // breath-like drift is added so the center isn't perfectly
+      // rigid.
+      const eo = earthOffsetRef.current;
+      const ocX = eo.x + 1.5 * Math.sin(now * 0.00022);
+      const ocY = eo.y + 0.8 * Math.sin(now * 0.00015 + 1.3);
 
-      // Sun position relative to the (now drifting) optical
-      // center, and its distance from it.
+      // Sun position (absolute, in vw/vh from viewport center).
       const [rawSx, rawSy, sunAlpha] = sunPosAt(cyclePct, wps);
 
       // ---- Sun glow (the big warm gradient) ----
@@ -324,8 +328,10 @@ export default function SunFlare() {
           Math.min(1, sunAlpha),
         ).toFixed(3);
       }
-      const sx = rawSx - camX;
-      const sy = rawSy - camY;
+
+      // Sun relative to the optical center (earth).
+      const sx = rawSx - ocX;
+      const sy = rawSy - ocY;
       const dist = Math.hypot(sx, sy);
 
       // Defocus growth: when the sun is near the optical axis, each
@@ -349,9 +355,9 @@ export default function SunFlare() {
       // sun's axis. Now the jitter is always perpendicular to the
       // current axis, so the chain stays visually tethered to the
       // sun no matter where the sun is.
-      const sunLen = Math.hypot(rawSx, rawSy);
-      const axisUnitX = sunLen > 0.01 ? rawSx / sunLen : 1;
-      const axisUnitY = sunLen > 0.01 ? rawSy / sunLen : 0;
+      const sunLen = Math.hypot(sx, sy);
+      const axisUnitX = sunLen > 0.01 ? sx / sunLen : 1;
+      const axisUnitY = sunLen > 0.01 ? sy / sunLen : 0;
       // Rotate 90° to get perpendicular direction.
       const perpUnitX = -axisUnitY;
       const perpUnitY = axisUnitX;
@@ -362,15 +368,15 @@ export default function SunFlare() {
         if (!el) continue;
 
         // Ghost position = opticalCenter + t · (sun - opticalCenter).
-        // With the optical center drifting as (camX, camY), this
+        // With the optical center at (ocX, ocY) (earth + drift), this
         // expands to camCoord · (1 - t) + t · sunCoord — meaning
         // far-from-center ghosts parallax *more* than near ones,
         // which is exactly what real off-axis elements do.
         // perpOffset is applied along the true perpendicular to the
         // axis (see sunLen / perpUnit calc above) so the chain stays
         // on-axis as the sun moves.
-        const gx = camX * (1 - g.t) + g.t * rawSx + g.perpOffset * perpUnitX;
-        const gy = camY * (1 - g.t) + g.t * rawSy + g.perpOffset * perpUnitY;
+        const gx = ocX * (1 - g.t) + g.t * rawSx + g.perpOffset * perpUnitX;
+        const gy = ocY * (1 - g.t) + g.t * rawSy + g.perpOffset * perpUnitY;
 
         // Size driven by three sources so the chain doesn't inflate
         // in lockstep:
