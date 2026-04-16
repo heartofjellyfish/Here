@@ -36,17 +36,20 @@ import { useEffect, useRef } from "react";
 // measured center, so the sun passes directly over the globe.
 const BASE_WAYPOINTS: ReadonlyArray<readonly [number, number, number, number]> = [
   [0, -80, 60, 0],
-  [1.3, -78, 58, 0.04],
-  [3.3, -70, 50, 0.11],
-  [5.9, -58, 35, 0.22],
-  [10.4, -45, 20, 0.34],
-  // After the flare chain lights up (~9%), the sun picks up a
-  // touch of extra speed — intermediate waypoints shifted 1% (~1.5s)
-  // earlier so each station is reached sooner. Subtle; the peak
-  // time stays locked at 46% so flare sync is preserved.
-  [16.5, -36, 10, 0.48],
-  [24, -24, 0, 0.66],
-  [31, -12, -8, 0.86],
+  [1.2, -78, 58, 0.04],
+  [3.0, -70, 50, 0.11],
+  [5.4, -58, 35, 0.22],
+  [9.6, -45, 20, 0.34],
+  // Whole pre-peak arc compressed ×0.92 for a brisker dawn — the
+  // rise feels ~8% faster from horizon to mid-sky. Peak stays
+  // locked at 46% so flare-chain sync, starburst timing, and the
+  // JS-driven ghost convergence don't shift. The small slowdown
+  // that this creates on the last mid→peak segment is masked by
+  // the sun's near-unity opacity there (already reads as "bright
+  // and climbing").
+  [15.2, -36, 10, 0.48],
+  [22.1, -24, 0, 0.66],
+  [28.5, -12, -8, 0.86],
   [46, 0, -13, 1],
   [54, 13, -9, 0.82],
   [61, 26, -1, 0.62],
