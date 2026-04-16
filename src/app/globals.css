@@ -283,24 +283,25 @@ body {
      rather than flat tint. */
   background: radial-gradient(
     closest-side,
-    rgba(255, 250, 230, 0.72) 0%,
-    rgba(255, 247, 220, 0.64) 10%,
-    rgba(255, 240, 200, 0.52) 22%,
-    rgba(255, 228, 175, 0.38) 36%,
-    rgba(255, 215, 155, 0.24) 52%,
-    rgba(255, 200, 140, 0.13) 68%,
-    rgba(255, 185, 125, 0.06) 82%,
-    rgba(255, 175, 115, 0.02) 92%,
+    rgba(255, 250, 230, 0.92) 0%,
+    rgba(255, 248, 222, 0.80) 6%,
+    rgba(255, 244, 210, 0.66) 14%,
+    rgba(255, 232, 185, 0.48) 28%,
+    rgba(255, 218, 160, 0.30) 44%,
+    rgba(255, 203, 145, 0.17) 60%,
+    rgba(255, 188, 128, 0.08) 76%,
+    rgba(255, 175, 115, 0.03) 90%,
     transparent 100%
   );
   opacity: 0;
-  /* Heavy blur on the 240vmax disc smooths the radial stops into
-     a continuous falloff. Without enough blur the sharper high-
-     alpha stops near the core become visible as concentric rings
-     when the overall element opacity is low (sunrise/sunset).
-     12px is tuned to the current stop density: reduce if the
-     hot core looks too diffuse at peak. */
-  filter: blur(12px);
+  /* Blur smooths the radial stops into a continuous falloff and
+     hides the 8-bit-color banding that's otherwise visible on
+     large low-DPR surfaces. 8px is a compromise: enough to dither
+     the rings during sunrise (when overall opacity is low and
+     discontinuities stand out), not so much that the hot core
+     gets flattened into its neighbors at peak (which read as a
+     hollow ring around a dim center). */
+  filter: blur(8px);
   /* Position and opacity are now driven per-frame by SunFlare.tsx's
      RAF tick — same waypoint table, same 153s cycle, but the zenith Y
      is patched at mount to match the earth's measured center so the
