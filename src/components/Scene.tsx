@@ -183,26 +183,33 @@ export default function Scene({ lang }: { lang: Lang }) {
     return () => clearTimeout(t);
   }, []);
 
-  // Auto-skip: if the user doesn't tap within ~40% of the sun cycle
-  // (61.2s from load), quietly retire the +1 prompt and let the earth
-  // slide into witness mode so they arrive at 合二为一 on schedule.
-  // The 8s earth-slide finishes right before sun peak (46% = 70.4s),
-  // so the ghost chain still converges on the globe as if they'd
-  // tapped. No ritual sweep, no reveal text, no home dot — the user
-  // didn't engage, so we don't celebrate; we just set the stage for
-  // witness mode and let them watch the world.
+  // Auto-skip: if the user doesn't tap within 30s from page load,
+  // quietly retire the +1 prompt and let the earth slide into witness
+  // mode. Earth arrives at center ~38s (8s slide); sun peak is still
+  // ~32s out from there, so the viewer has time to settle into the
+  // witness posture before the ghost chain sweeps overhead.
   //
-  // Anchored to performance.now() (same clock family as SunFlare's
-  // cycle start) so this lands on the intended sun position even if
-  // Scene mounted a little later than SunFlare. Cleanup on phase
-  // change means any user tap before the timer fires cancels it —
-  // the real +1 path takes over naturally.
+  // Deliberately quiet: no dissolve wisps, no ritual sweep, no
+  // "you're not alone" copy, no cosmic flash, no home dot. The
+  // stars-flash and reveal text are punctuation earned by the +1
+  // action; rewarding passivity cheapens both. This path just fades
+  // the prompt out and lets the earth settle into its witness posture.
+  //
+  // Music: setPhase("revealed") flips BackgroundMusic's `play` prop
+  // true, but since this fires from a setTimeout (not a user gesture)
+  // browsers reject autoplay. BackgroundMusic handles the fallback —
+  // attaches one-shot listeners so the first subsequent click / touch
+  // / keydown starts the music. If the user never engages, music stays
+  // silent, which is correct.
+  //
+  // Anchored to performance.now() so this lands at 30s of wall clock
+  // regardless of Scene's mount latency. Cleanup on phase change
+  // means any user tap before the timer fires cancels it — the real
+  // +1 path takes over naturally.
   useEffect(() => {
     if (phase !== "idle") return;
-    const SUN_CYCLE_MS = 153_000;
-    const AUTO_SKIP_AT_SUN_PCT = 40;
-    const fireAtMs = SUN_CYCLE_MS * (AUTO_SKIP_AT_SUN_PCT / 100);
-    const delay = Math.max(0, fireAtMs - performance.now());
+    const AUTO_SKIP_AT_MS = 30_000;
+    const delay = Math.max(0, AUTO_SKIP_AT_MS - performance.now());
     const t = window.setTimeout(() => {
       // Set phase+centered+witness in one batch: stage--revealed
       // hides the idle UI (phrase + tap), stage--centered keeps the

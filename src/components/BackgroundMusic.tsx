@@ -78,22 +78,50 @@ export default function BackgroundMusic({ play }: { play: boolean }) {
     }, FADE_TICK_MS);
   }
 
-  // First-tap trigger: start playback (the tap is the gesture that
-  // unlocks audio) and fade in unless the user previously chose to
-  // mute. We do NOT fight `play` going false later — once the music
-  // starts, it keeps going through witness mode; only the user's mute
-  // toggle stops it.
+  // First-play trigger: start playback and fade in unless the user
+  // previously chose to mute. We do NOT fight `play` going false
+  // later — once the music starts, it keeps going through witness
+  // mode; only the user's mute toggle stops it.
+  //
+  // Two paths flip `play` true:
+  //   (1) real +1 tap — fires inside a click handler, so audio.play()
+  //       works directly (the click is the user gesture that unlocks
+  //       autoplay).
+  //   (2) auto-skip at sun 40% — fires from a setTimeout, which is NOT
+  //       a user gesture. Browsers reject audio.play() in that context.
+  //       So we fall back: attach one-shot gesture listeners, and on
+  //       the next click/touch/keydown we retry. If the user never
+  //       engages, music never plays — which is correct behavior for
+  //       autoplay policies and fine for the experience.
   useEffect(() => {
     if (!play || revealed) return;
     setRevealed(true);
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = 0;
-    audio.play().catch(() => {
-      // Should not happen — `play` flips true inside a click handler,
-      // which counts as a gesture. Swallow rather than crash.
+
+    const ramp = () => {
+      if (!muted) fadeTo(TARGET_VOLUME, FADE_IN_MS);
+    };
+
+    audio.play().then(ramp).catch(() => {
+      // Autoplay blocked — likely the auto-skip path (no prior gesture).
+      // Wait for any user gesture and retry. `once: true` on each
+      // listener + a shared cleanup below keeps this tidy.
+      const retry = () => {
+        audio.play().then(() => {
+          ramp();
+          window.removeEventListener("click", retry);
+          window.removeEventListener("touchstart", retry);
+          window.removeEventListener("keydown", retry);
+        }).catch(() => {
+          // Still blocked somehow — listeners stay armed for a later try.
+        });
+      };
+      window.addEventListener("click", retry);
+      window.addEventListener("touchstart", retry);
+      window.addEventListener("keydown", retry);
     });
-    if (!muted) fadeTo(TARGET_VOLUME, FADE_IN_MS);
   }, [play, revealed, muted]);
 
   // React to mute changes after the music has been revealed. The
