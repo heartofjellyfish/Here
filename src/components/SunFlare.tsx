@@ -195,8 +195,8 @@ export default function SunFlare() {
   const starburstRef = useRef<HTMLDivElement | null>(null);
   const godRaysRef = useRef<HTMLDivElement | null>(null);
   const sunGlowRef = useRef<HTMLDivElement | null>(null);
-  // Mutable copy of waypoints — zenith Y is patched at mount to match
-  // the earth's measured screen position.
+  // Mutable copy of waypoints — the entire arc is shifted vertically
+  // at mount so the zenith aligns with the earth's measured center.
   const waypointsRef = useRef<number[][]>(
     BASE_WAYPOINTS.map((w) => [w[0], w[1], w[2], w[3]]),
   );
@@ -212,18 +212,25 @@ export default function SunFlare() {
       return;
     }
 
-    // Measure the earth's center (in vh from viewport center) so the
-    // sun's zenith passes directly over the globe. The earth is fixed
-    // in a flex column — its position depends on viewport size but
-    // doesn't change during the session (besides self-rotation).
+    // Measure the earth's center and shift the ENTIRE arc vertically
+    // so the zenith lands on the globe's center. We compute the delta
+    // between the original zenith Y (-13vh from viewport center) and
+    // the earth's measured center, then apply that delta to every
+    // waypoint. This keeps the arc's shape intact while raising or
+    // lowering it as a whole — sunrise and sunset shift by the same
+    // amount, so the parabola stays smooth.
     function patchZenith() {
       const el = document.querySelector(".earth-wrap");
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const cy = rect.top + rect.height / 2;
       const vh = window.innerHeight;
-      const offsetVh = ((cy / vh) - 0.5) * 100;
-      waypointsRef.current[8][2] = offsetVh; // zenith Y
+      const earthVh = ((cy / vh) - 0.5) * 100; // earth center in vh from viewport center
+      const originalZenithY = BASE_WAYPOINTS[8][2]; // -13
+      const delta = earthVh - originalZenithY;
+      for (let i = 0; i < waypointsRef.current.length; i++) {
+        waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
+      }
     }
     patchZenith();
     window.addEventListener("resize", patchZenith);
