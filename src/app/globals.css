@@ -571,11 +571,14 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  /* vmax so mobile portrait (where vmax === vh) gets the full
-     long-axis reach instead of being squashed to 32vw ≈ 120px.
-     Landscape (vmax === vw) is unchanged. */
-  width: 40vmax;
-  height: 40vmax;
+  /* 32vw base keeps the landscape desktop size unchanged. Tried 40vmax
+     to give portrait mobile a longer reach, but at JS-peak scale ×1.7
+     it overflowed the viewport and read as "too much" — the new
+     brighter gradient stops below already push the spikes harder than
+     the old faint hairlines, so keeping the footprint modest preserves
+     the "star on the sun" read rather than "plus-sign across the screen". */
+  width: 32vw;
+  height: 32vw;
   opacity: 0;
   will-change: transform, opacity;
   /* Horizontal + vertical hairline: two linear gradients crossed
