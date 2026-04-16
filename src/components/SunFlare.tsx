@@ -36,16 +36,16 @@ import { useEffect, useRef } from "react";
 // measured center, so the sun passes directly over the globe.
 const BASE_WAYPOINTS: ReadonlyArray<readonly [number, number, number, number]> = [
   [0, -80, 60, 0],
-  [1, -78, 58, 0.05],
-  [2.5, -70, 50, 0.14],
-  [4.5, -58, 35, 0.28],
-  [8, -45, 20, 0.42],
+  [1.3, -78, 58, 0.04],
+  [3.3, -70, 50, 0.11],
+  [5.9, -58, 35, 0.22],
+  [10.4, -45, 20, 0.34],
   // After the flare chain lights up (~9%), the sun picks up a
   // touch of extra speed — intermediate waypoints shifted 1% (~1.5s)
   // earlier so each station is reached sooner. Subtle; the peak
   // time stays locked at 46% so flare sync is preserved.
-  [13, -36, 10, 0.56],
-  [21, -24, 0, 0.72],
+  [16.5, -36, 10, 0.48],
+  [24, -24, 0, 0.66],
   [31, -12, -8, 0.86],
   [46, 0, -13, 1],
   [54, 13, -9, 0.82],
@@ -221,11 +221,20 @@ export default function SunFlare() {
       waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
     }
 
+    // Anchor the sun's clock to page load, not wall-clock time. If we
+    // used `now % SUN_CYCLE_MS` directly, opening the page could drop
+    // the viewer into the middle of a sunrise — the user would see
+    // the glow "surge in from the lower-left" instead of rising from
+    // below the horizon. With a load-time epoch, every page visit
+    // starts at cyclePct=0 (sun below horizon, opacity 0), giving a
+    // gentle "fresh dawn" each time.
+    const clockStart = performance.now();
+
     let raf = 0;
 
     const tick = () => {
       const now = performance.now();
-      const cyclePct = ((now % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
+      const cyclePct = (((now - clockStart) % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
       const wps = waypointsRef.current as unknown as Waypoints;
 
       // Envelope: zero outside the window. Peak is pinned to the
