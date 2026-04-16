@@ -816,6 +816,124 @@ export default function Earth({
     })();
     const witnessHalf = witnessSprite.width / 2;
 
+    // --- Ritual highlight sprites (primary + secondary) ---
+    // Same pattern as witness sprite: bake at full intensity, draw with
+    // globalAlpha. Eliminates createRadialGradient per country per frame.
+    const RITUAL_PRIMARY_GLOW_R = 14 * dpr;
+    const RITUAL_PRIMARY_CORE_R = 3.2 * dpr;
+    const RITUAL_PRIMARY_COLOR = "255, 232, 205";
+    const ritualPrimarySprite = (() => {
+      const pad = 1;
+      const dim = Math.ceil(RITUAL_PRIMARY_GLOW_R * 2 + pad * 2);
+      const c = document.createElement("canvas");
+      c.width = dim;
+      c.height = dim;
+      const sctx = c.getContext("2d");
+      if (!sctx) return c;
+      const sc = dim / 2;
+      const grad = sctx.createRadialGradient(sc, sc, 0, sc, sc, RITUAL_PRIMARY_GLOW_R);
+      grad.addColorStop(0, `rgba(${RITUAL_PRIMARY_COLOR}, 0.98)`);
+      grad.addColorStop(0.35, `rgba(${RITUAL_PRIMARY_COLOR}, 0.42)`);
+      grad.addColorStop(1, `rgba(${RITUAL_PRIMARY_COLOR}, 0)`);
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(sc, sc, RITUAL_PRIMARY_GLOW_R, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.fillStyle = `rgba(${RITUAL_PRIMARY_COLOR}, 1)`;
+      sctx.beginPath();
+      sctx.arc(sc, sc, RITUAL_PRIMARY_CORE_R, 0, Math.PI * 2);
+      sctx.fill();
+      return c;
+    })();
+    const ritualPrimaryHalf = ritualPrimarySprite.width / 2;
+
+    const RITUAL_SEC_GLOW_R = 7 * dpr;
+    const RITUAL_SEC_CORE_R = 1.5 * dpr;
+    const RITUAL_SEC_COLOR = "210, 225, 238";
+    const ritualSecSprite = (() => {
+      const pad = 1;
+      const dim = Math.ceil(RITUAL_SEC_GLOW_R * 2 + pad * 2);
+      const c = document.createElement("canvas");
+      c.width = dim;
+      c.height = dim;
+      const sctx = c.getContext("2d");
+      if (!sctx) return c;
+      const sc = dim / 2;
+      const grad = sctx.createRadialGradient(sc, sc, 0, sc, sc, RITUAL_SEC_GLOW_R);
+      grad.addColorStop(0, `rgba(${RITUAL_SEC_COLOR}, 0.98)`);
+      grad.addColorStop(0.35, `rgba(${RITUAL_SEC_COLOR}, 0.42)`);
+      grad.addColorStop(1, `rgba(${RITUAL_SEC_COLOR}, 0)`);
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(sc, sc, RITUAL_SEC_GLOW_R, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.fillStyle = `rgba(${RITUAL_SEC_COLOR}, 1)`;
+      sctx.beginPath();
+      sctx.arc(sc, sc, RITUAL_SEC_CORE_R, 0, Math.PI * 2);
+      sctx.fill();
+      return c;
+    })();
+    const ritualSecHalf = ritualSecSprite.width / 2;
+
+    // --- Home point sprite ---
+    // Heartbeat intensity + shimmer folded into globalAlpha.
+    // Shimmer range is 0.85–1.0, so folding it into globalAlpha
+    // (which scales all stops uniformly) is visually indistinguishable.
+    const HOME_GLOW_R = 10 * dpr;
+    const HOME_CORE_R = 2.2 * dpr;
+    const HOME_COLOR = "255, 232, 205";
+    const homeSprite = (() => {
+      const pad = 1;
+      const dim = Math.ceil(HOME_GLOW_R * 2 + pad * 2);
+      const c = document.createElement("canvas");
+      c.width = dim;
+      c.height = dim;
+      const sctx = c.getContext("2d");
+      if (!sctx) return c;
+      const sc = dim / 2;
+      const grad = sctx.createRadialGradient(sc, sc, 0, sc, sc, HOME_GLOW_R);
+      grad.addColorStop(0, `rgba(${HOME_COLOR}, 0.9)`);
+      grad.addColorStop(0.4, `rgba(${HOME_COLOR}, 0.36)`);
+      grad.addColorStop(1, `rgba(${HOME_COLOR}, 0)`);
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(sc, sc, HOME_GLOW_R, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.fillStyle = `rgba(${HOME_COLOR}, 1)`;
+      sctx.beginPath();
+      sctx.arc(sc, sc, HOME_CORE_R, 0, Math.PI * 2);
+      sctx.fill();
+      return c;
+    })();
+    const homeHalf = homeSprite.width / 2;
+
+    // --- Moon sprite ---
+    // Phase-dependent alpha folded into globalAlpha. The inner gradient
+    // offset (litDx/litDy) changes per frame, but the moon is tiny
+    // (4.2px radius) so centering the baked gradient is visually
+    // identical. Color stops baked at phase=1.
+    const MOON_R = 4.2 * dpr;
+    const moonSprite = (() => {
+      const pad = 1;
+      const dim = Math.ceil(MOON_R * 2 + pad * 2);
+      const c = document.createElement("canvas");
+      c.width = dim;
+      c.height = dim;
+      const sctx = c.getContext("2d");
+      if (!sctx) return c;
+      const sc = dim / 2;
+      const grad = sctx.createRadialGradient(sc, sc, 0, sc, sc, MOON_R);
+      grad.addColorStop(0, `rgba(232, 226, 214, 0.78)`);
+      grad.addColorStop(0.7, `rgba(180, 178, 172, 0.48)`);
+      grad.addColorStop(1, "rgba(120, 120, 120, 0)");
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(sc, sc, MOON_R, 0, Math.PI * 2);
+      sctx.fill();
+      return c;
+    })();
+    const moonHalf = moonSprite.width / 2;
+
     const dots = fibSphere(3600);
     const cx = BUF / 2;
     const cy = BUF / 2;
@@ -967,30 +1085,13 @@ export default function Earth({
         if (!occluded) {
           const moonSx = cx + R * mx;
           const moonSy = cy - R * my;
-          const moonR = 4.2 * dpr;
-
           // Phase: shade by the same key light as the earth so they read
-          // as belonging to the same scene. Bias a radial gradient toward
-          // the lit hemisphere.
+          // as belonging to the same scene.
           const lit = Math.max(0, LX * mx + LY * my + LZ * mz) / MOON_ORBIT_R;
           const phase = 0.45 + 0.55 * lit;
-          const litDx = LX * moonR * 0.45;
-          const litDy = -LY * moonR * 0.45;
-          const grad = ctx.createRadialGradient(
-            moonSx + litDx,
-            moonSy + litDy,
-            0,
-            moonSx,
-            moonSy,
-            moonR,
-          );
-          grad.addColorStop(0, `rgba(232, 226, 214, ${(0.78 * phase).toFixed(3)})`);
-          grad.addColorStop(0.7, `rgba(180, 178, 172, ${(0.48 * phase).toFixed(3)})`);
-          grad.addColorStop(1, "rgba(120, 120, 120, 0)");
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(moonSx, moonSy, moonR, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.globalAlpha = phase;
+          ctx.drawImage(moonSprite, moonSx - moonHalf, moonSy - moonHalf);
+          ctx.globalAlpha = 1;
         }
       }
 
@@ -1046,31 +1147,11 @@ export default function Earth({
             // Primary is noticeably stronger — the user's point should
             // be the gravitational center of the reveal, not just one
             // among the chorus.
-            const glowR = (isPrimary ? 14 : 7) * dpr;
-            const coreR = (isPrimary ? 3.2 : 1.5) * dpr;
-            const color = isPrimary
-              ? "255, 232, 205"
-              : "210, 225, 238";
-
-            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
-            grad.addColorStop(
-              0,
-              `rgba(${color}, ${(0.98 * intensity).toFixed(3)})`,
-            );
-            grad.addColorStop(
-              0.35,
-              `rgba(${color}, ${(0.42 * intensity).toFixed(3)})`,
-            );
-            grad.addColorStop(1, `rgba(${color}, 0)`);
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = `rgba(${color}, ${intensity.toFixed(3)})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy, coreR, 0, Math.PI * 2);
-            ctx.fill();
+            const sprite = isPrimary ? ritualPrimarySprite : ritualSecSprite;
+            const half = isPrimary ? ritualPrimaryHalf : ritualSecHalf;
+            ctx.globalAlpha = intensity;
+            ctx.drawImage(sprite, sx - half, sy - half);
+            ctx.globalAlpha = 1;
           }
         }
       }
@@ -1185,29 +1266,9 @@ export default function Earth({
             const shimmer = 0.85 + 0.15 * Math.sin(tSec * 0.47 + 1.3);
             const intensity = breath * (0.55 + 0.45 * limb);
 
-            const glowR = 10 * dpr;
-            const coreR2 = 2.2 * dpr;
-            const color = "255, 232, 205"; // matches ritual primary
-
-            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
-            grad.addColorStop(
-              0,
-              `rgba(${color}, ${(0.9 * intensity).toFixed(3)})`,
-            );
-            grad.addColorStop(
-              0.4,
-              `rgba(${color}, ${(0.36 * intensity * shimmer).toFixed(3)})`,
-            );
-            grad.addColorStop(1, `rgba(${color}, 0)`);
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = `rgba(${color}, ${intensity.toFixed(3)})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy, coreR2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.globalAlpha = intensity * shimmer;
+            ctx.drawImage(homeSprite, sx - homeHalf, sy - homeHalf);
+            ctx.globalAlpha = 1;
           }
         }
       }

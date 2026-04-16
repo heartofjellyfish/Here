@@ -36,16 +36,16 @@ import { useEffect, useRef } from "react";
 // measured center, so the sun passes directly over the globe.
 const BASE_WAYPOINTS: ReadonlyArray<readonly [number, number, number, number]> = [
   [0, -80, 60, 0],
-  [0.6, -78, 58, 0.09],
-  [1.5, -70, 50, 0.22],
-  [3, -58, 35, 0.36],
-  [6, -45, 20, 0.5],
+  [1, -78, 58, 0.05],
+  [2.5, -70, 50, 0.14],
+  [4.5, -58, 35, 0.28],
+  [8, -45, 20, 0.42],
   // After the flare chain lights up (~9%), the sun picks up a
   // touch of extra speed — intermediate waypoints shifted 1% (~1.5s)
   // earlier so each station is reached sooner. Subtle; the peak
   // time stays locked at 46% so flare sync is preserved.
-  [11, -36, 10, 0.6],
-  [19, -24, 0, 0.72],
+  [13, -36, 10, 0.56],
+  [21, -24, 0, 0.72],
   [31, -12, -8, 0.86],
   [46, 0, -13, 1],
   [54, 13, -9, 0.82],

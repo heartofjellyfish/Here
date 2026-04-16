@@ -415,21 +415,8 @@ export default function Scene({ lang }: { lang: Lang }) {
     };
   }, [witnessActiveAt]);
 
-  // GC: drop witnesses whose blooms have finished. Separate from the
-  // poll loop so it ticks even when no new taps are arriving, keeping
-  // the prop stable-small for Earth.
-  useEffect(() => {
-    if (witnessActiveAt == null) return;
-    const id = window.setInterval(() => {
-      const cutoff = Date.now() - lifetimeMs;
-      setWitnesses((prev) =>
-        prev.some((w) => w.appearAt <= cutoff)
-          ? prev.filter((w) => w.appearAt > cutoff)
-          : prev,
-      );
-    }, 3_000);
-    return () => window.clearInterval(id);
-  }, [witnessActiveAt, lifetimeMs]);
+  // GC is handled inside the poll callback's setWitnesses filter —
+  // no separate interval needed.
 
   const stagger = phraseIsStaggered(lang);
 
