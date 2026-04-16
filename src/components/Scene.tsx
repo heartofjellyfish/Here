@@ -194,7 +194,7 @@ export default function Scene({ lang }: { lang: Lang }) {
     const rect = el.getBoundingClientRect();
     const cy = rect.top + rect.height / 2;
     const offsetPx = window.innerHeight / 2 - cy;
-    el.style.transition = "transform 2.5s cubic-bezier(0.25, 0, 0.15, 1)";
+    el.style.transition = "transform 8s cubic-bezier(0.25, 0, 0.15, 1)";
     el.style.transform = `translateY(${offsetPx}px)`;
   }, [centered]);
 
