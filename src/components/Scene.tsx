@@ -187,6 +187,13 @@ export default function Scene({ lang }: { lang: Lang }) {
   // its moment. The sun's zenith is also at viewport center (see
   // SunFlare.tsx), so when the sun passes overhead the ghost chain
   // converges on the globe — physically correct "合二为一".
+  //
+  // The starfield drifts down with the earth at ~15% of the
+  // displacement, as if the whole scene were seen through a camera
+  // that's slowly tilting up to follow the globe. Parallax: stars
+  // are "far" so they move less than the foreground. Zero runtime
+  // cost — the starfield container gets a single transform, GPU
+  // moves all 150 stars as one compositor layer.
   useEffect(() => {
     if (!centered) return;
     const el = earthRef.current;
@@ -196,6 +203,12 @@ export default function Scene({ lang }: { lang: Lang }) {
     const offsetPx = window.innerHeight / 2 - cy;
     el.style.transition = "transform 8s cubic-bezier(0.25, 0, 0.15, 1)";
     el.style.transform = `translateY(${offsetPx}px)`;
+
+    const starfield = document.querySelector(".starfield") as HTMLElement | null;
+    if (starfield) {
+      starfield.style.transition = "transform 8s cubic-bezier(0.25, 0, 0.15, 1)";
+      starfield.style.transform = `translateY(${offsetPx * 0.15}px)`;
+    }
   }, [centered]);
 
   // Pick a comfortable earth size: ~80% of the viewport's shortest side,
