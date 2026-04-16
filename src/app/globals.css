@@ -1103,6 +1103,21 @@ body {
   animation: music-toggle-in 2200ms ease 1400ms forwards;
 }
 
+/* Speaker icon stays invisible during the starburst — the user sees
+   a star first, then the star fades and the speaker quietly appears
+   in its place. Delay is tuned so the icon cross-fades in as the
+   rays are dimming out (~3.5s after mount = starburst tail end). */
+.music-toggle svg {
+  opacity: 0;
+  animation: music-icon-in 600ms ease 3500ms forwards;
+}
+
+@keyframes music-icon-in {
+  to {
+    opacity: 1;
+  }
+}
+
 .music-toggle:hover {
   color: rgba(232, 236, 242, 0.78);
 }
@@ -1213,6 +1228,10 @@ body {
   .music-toggle::before,
   .music-toggle::after {
     animation: none;
+  }
+  .music-toggle svg {
+    animation: none;
+    opacity: 1;
   }
 }
 
