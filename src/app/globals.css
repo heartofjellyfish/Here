@@ -321,6 +321,7 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  overflow: visible;
   /* Above .sun-glow (z:0) and the stage (z:1–2) so the ghosts pass
      over the earth the way a real camera flare would; below .grain
      (z:5) so the grain still textures them. */
