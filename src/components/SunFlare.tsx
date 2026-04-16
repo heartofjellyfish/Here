@@ -26,31 +26,37 @@ import { useEffect, useRef } from "react";
  */
 
 // ---- Sun arc waypoints ----
-// MUST stay in sync with the .sun-glow @keyframes sunArc in globals.css.
-// Format: [cyclePct, translateX in vw, translateY in vh].
-const SUN_WAYPOINTS: ReadonlyArray<readonly [number, number, number]> = [
-  [0, -80, 60],
-  [0.6, -78, 58],
-  [1.5, -70, 50],
-  [3, -58, 35],
-  [6, -45, 20],
+// Single source of truth for the sun's path. Previously the glow was
+// a CSS @keyframes and this JS table was a mirror that "MUST stay in
+// sync." Now the glow is driven from the same JS tick as the flare
+// ghosts, so there's no sync problem — one table, one clock.
+//
+// Format: [cyclePct, translateX (vw), translateY (vh), opacity].
+// The zenith Y (index 8) is patched at mount to match the earth's
+// measured center, so the sun passes directly over the globe.
+const BASE_WAYPOINTS: ReadonlyArray<readonly [number, number, number, number]> = [
+  [0, -80, 60, 0],
+  [0.6, -78, 58, 0.09],
+  [1.5, -70, 50, 0.22],
+  [3, -58, 35, 0.36],
+  [6, -45, 20, 0.5],
   // After the flare chain lights up (~9%), the sun picks up a
   // touch of extra speed — intermediate waypoints shifted 1% (~1.5s)
   // earlier so each station is reached sooner. Subtle; the peak
   // time stays locked at 46% so flare sync is preserved.
-  [11, -36, 10],
-  [19, -24, 0],
-  [31, -12, -8],
-  [46, 0, -13],
-  [54, 13, -9],
-  [61, 26, -1],
-  [68, 40, 11],
-  [75, 52, 25],
-  [82, 62, 40],
-  [88, 70, 52],
-  [92, 100, 130],
-  [97, -100, 130],
-  [100, -80, 60],
+  [11, -36, 10, 0.6],
+  [19, -24, 0, 0.72],
+  [31, -12, -8, 0.86],
+  [46, 0, -13, 1],
+  [54, 13, -9, 0.82],
+  [61, 26, -1, 0.62],
+  [68, 40, 11, 0.48],
+  [75, 52, 25, 0.32],
+  [82, 62, 40, 0.18],
+  [88, 70, 52, 0],
+  [92, 100, 130, 0],
+  [97, -100, 130, 0],
+  [100, -80, 60, 0],
 ];
 
 const SUN_CYCLE_MS = 153_000;
@@ -162,23 +168,38 @@ const GHOSTS: GhostDef[] = [
   { t: -1.5, size: 4.5, hue: "255, 155, 92", kind: "disc", blur: 1.3, alphaPhase: 0.4, perpOffset: 0, defocusResponse: 0.6, sizePhase: 2.8 },
 ];
 
-// Linearly interpolate sun position from the waypoint table.
-function sunPosAt(cyclePct: number): [number, number] {
-  for (let i = 0; i < SUN_WAYPOINTS.length - 1; i++) {
-    const [p0, x0, y0] = SUN_WAYPOINTS[i];
-    const [p1, x1, y1] = SUN_WAYPOINTS[i + 1];
+// Linearly interpolate sun position + opacity from a waypoint table.
+type Waypoints = ReadonlyArray<readonly [number, number, number, number]>;
+
+function sunPosAt(
+  cyclePct: number,
+  wps: Waypoints,
+): [number, number, number] {
+  for (let i = 0; i < wps.length - 1; i++) {
+    const [p0, x0, y0, a0] = wps[i];
+    const [p1, x1, y1, a1] = wps[i + 1];
     if (cyclePct >= p0 && cyclePct <= p1) {
       const k = (cyclePct - p0) / (p1 - p0);
-      return [x0 + (x1 - x0) * k, y0 + (y1 - y0) * k];
+      return [
+        x0 + (x1 - x0) * k,
+        y0 + (y1 - y0) * k,
+        a0 + (a1 - a0) * k,
+      ];
     }
   }
-  return [SUN_WAYPOINTS[0][1], SUN_WAYPOINTS[0][2]];
+  return [wps[0][1], wps[0][2], wps[0][3]];
 }
 
 export default function SunFlare() {
   const ghostRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starburstRef = useRef<HTMLDivElement | null>(null);
   const godRaysRef = useRef<HTMLDivElement | null>(null);
+  const sunGlowRef = useRef<HTMLDivElement | null>(null);
+  // Mutable copy of waypoints — zenith Y is patched at mount to match
+  // the earth's measured screen position.
+  const waypointsRef = useRef<number[][]>(
+    BASE_WAYPOINTS.map((w) => [w[0], w[1], w[2], w[3]]),
+  );
 
   useEffect(() => {
     // Respect the OS "prefers-reduced-motion" setting — a chain of
@@ -191,11 +212,28 @@ export default function SunFlare() {
       return;
     }
 
+    // Measure the earth's center (in vh from viewport center) so the
+    // sun's zenith passes directly over the globe. The earth is fixed
+    // in a flex column — its position depends on viewport size but
+    // doesn't change during the session (besides self-rotation).
+    function patchZenith() {
+      const el = document.querySelector(".earth-wrap");
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const cy = rect.top + rect.height / 2;
+      const vh = window.innerHeight;
+      const offsetVh = ((cy / vh) - 0.5) * 100;
+      waypointsRef.current[8][2] = offsetVh; // zenith Y
+    }
+    patchZenith();
+    window.addEventListener("resize", patchZenith);
+
     let raf = 0;
 
     const tick = () => {
       const now = performance.now();
       const cyclePct = ((now % SUN_CYCLE_MS) / SUN_CYCLE_MS) * 100;
+      const wps = waypointsRef.current as unknown as Waypoints;
 
       // Envelope: zero outside the window. Peak is pinned to the
       // sun's zenith (46%), not the window midpoint — a symmetric
@@ -264,7 +302,21 @@ export default function SunFlare() {
 
       // Sun position relative to the (now drifting) optical
       // center, and its distance from it.
-      const [rawSx, rawSy] = sunPosAt(cyclePct);
+      const [rawSx, rawSy, sunAlpha] = sunPosAt(cyclePct, wps);
+
+      // ---- Sun glow (the big warm gradient) ----
+      // Driven from this same tick so the glow and the flare ghosts
+      // share one clock — no drift. Position and opacity come from
+      // the same waypoint table; the zenith Y was patched at mount
+      // to match the earth center.
+      if (sunGlowRef.current) {
+        sunGlowRef.current.style.transform =
+          `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh)`;
+        sunGlowRef.current.style.opacity = Math.max(
+          0,
+          Math.min(1, sunAlpha),
+        ).toFixed(3);
+      }
       const sx = rawSx - camX;
       const sy = rawSy - camY;
       const dist = Math.hypot(sx, sy);
@@ -488,10 +540,15 @@ export default function SunFlare() {
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", patchZenith);
+    };
   }, []);
 
   return (
+    <>
+    <div ref={sunGlowRef} className="sun-glow" aria-hidden="true" />
     <div className="sun-flare" aria-hidden="true">
       {/* Turbulence filter for god rays — breaks the clean
           repeating-conic-gradient spokes into fuzzy, variable-length
@@ -550,5 +607,6 @@ export default function SunFlare() {
         />
       ))}
     </div>
+    </>
   );
 }
