@@ -308,6 +308,23 @@ body {
      sun passes directly over the globe ("合二为一"). */
 }
 
+/* Mobile perf: the 240vmax sun-glow is the most expensive single
+   surface in the scene — a full-viewport+ radial gradient with
+   filter: blur running through mobile GPUs struggles near peak
+   opacity. Mobile DPR (2–3×) already hides the banding that blur
+   was dithering on desktop, so dropping blur here is almost a no-op
+   visually. Same for the god rays — readable on desktop, but on a
+   small screen the fine angular structure barely parses; the perf
+   they cost during their 38–54% window isn't worth what they add. */
+@media (max-width: 900px) {
+  .sun-glow {
+    filter: none;
+  }
+  .sun-flare__rays {
+    display: none;
+  }
+}
+
 /* ---------- Sun lens flare ----------
    A physics-inspired chain of ghost reflections that live on the
    axis from the sun through the viewport's optical center. Position,

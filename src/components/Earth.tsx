@@ -756,7 +756,16 @@ export default function Earth({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // DPR cap: desktop 2×, mobile 1.5×. On phones (DPR 2–3), the
+    // canvas is already rendered at 2× physical pixels — dropping to
+    // 1.5 cuts the per-frame fill cost by ~44% (1.5²/2² = 0.5625).
+    // The browser upscales the canvas texture to CSS size so the
+    // earth is just a touch softer; dot density and moon/witness
+    // sprites all rescale proportionally since they use `* dpr`.
+    const isMobile =
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 900px)").matches;
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
     const BUF = Math.round(size * dpr);
     canvas.width = BUF;
     canvas.height = BUF;
