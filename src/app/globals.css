@@ -1190,21 +1190,17 @@ body {
     opacity: 0;
     transform: translate(-50%, -50%) scale(0) rotate(0deg);
   }
-  30% {
+  50% {
     opacity: 0.9;
-    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    transform: translate(-50%, -50%) scale(1) rotate(35deg);
   }
-  55% {
-    opacity: 0.4;
-    transform: translate(-50%, -50%) scale(1.05) rotate(22deg);
-  }
-  80% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.3) rotate(35deg);
+  75% {
+    opacity: 0.2;
+    transform: translate(-50%, -50%) scale(0.5) rotate(55deg);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0) rotate(40deg);
+    transform: translate(-50%, -50%) scale(0) rotate(70deg);
   }
 }
 
