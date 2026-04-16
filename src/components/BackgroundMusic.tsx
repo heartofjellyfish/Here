@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Lia Ouyang Rusli — "LOVE (Variation 1)" from the Happyend OST as the
- * ambient layer of the ritual. Browsers won't play audio without a
- * user gesture, so this component does nothing until `play` flips true
- * (which Scene wires to the moment the user taps). The piano then
- * fades in over 1.5s — the wisp is just landing on the earth, the
- * first chord arrives with the ignition.
+ * Gymnopédie No. 1 (Remastered) as the ambient layer of the ritual.
+ * Peaceful, not sad — the right register for witnessing. Browsers
+ * won't play audio without a user gesture, so this component does
+ * nothing until `play` flips true (which Scene wires to the moment
+ * the user taps). The piano then fades in over 1.5s — the wisp is
+ * just landing on the earth, the first chord arrives with the ignition.
  *
  * The mute toggle:
  *   • appears once the music has been triggered (not before — no point
@@ -136,7 +136,7 @@ export default function BackgroundMusic({ play }: { play: boolean }) {
     <>
       <audio
         ref={audioRef}
-        src="/audio/love-variation-1.mp3"
+        src="/audio/gymnopedie-1.mp3"
         loop
         preload="auto"
         aria-hidden="true"
