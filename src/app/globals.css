@@ -571,72 +571,92 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  /* 32vw base keeps the landscape desktop size unchanged. Tried 40vmax
-     to give portrait mobile a longer reach, but at JS-peak scale ×1.7
-     it overflowed the viewport and read as "too much" — the new
-     brighter gradient stops below already push the spikes harder than
-     the old faint hairlines, so keeping the footprint modest preserves
-     the "star on the sun" read rather than "plus-sign across the screen". */
-  width: 32vw;
-  height: 32vw;
+  /* Desktop: modest 20vw keeps the starburst as accent, not spectacle.
+     Mobile override below bumps to 28vmax with extra gradient layers. */
+  width: 20vw;
+  height: 20vw;
   opacity: 0;
   will-change: transform, opacity;
-  /* Horizontal + vertical hairline: two linear gradients crossed
-     at right angles. Each is bright-at-midline, fading to
-     transparent at the ends. Inner hot core comes from a small
-     radial gradient layered on top. */
-  /* Four stacked radial-gradient layers:
-     1. A hot near-white core (the sun-through-aperture hotspot) —
-        wider and more saturated than before so the starburst reads
-        as an overexposed sun disc, not just a cross.
-     2. A horizontal ellipse spike (thin cross-axis, long reach).
-     3. A vertical ellipse spike.
-     4. A second pair of spikes at 0.8% thickness overlaid on top —
-        gives the spikes a brighter inner line, like how a real
-        8-bladed aperture concentrates light in the center of each
-        spike. Reads as "thin bright ridge inside a softer halo"
-        instead of a single hairline.
+  /* Three stacked radial-gradient layers (desktop):
+     1. A hot near-white core (the sun-through-aperture hotspot)
+     2. A very thin horizontal ellipse (the horizontal spike)
+     3. A very thin vertical ellipse (the vertical spike)
+     Stacked as additive warmth via the container's screen blend.
      The ellipses use tiny cross-axis radii (0.5%) so each spike
-     is a hairline band, and large long-axis radii (55%) so the
-     spike reaches past the edge of the starburst box. */
+     is a hairline band, and large long-axis radii (50%) so the
+     spike reaches to the edge of the starburst box. */
   background:
     radial-gradient(
       circle at center,
-      rgba(255, 250, 230, 1) 0%,
-      rgba(255, 245, 210, 0.85) 3%,
-      rgba(255, 235, 185, 0.45) 8%,
-      rgba(255, 222, 160, 0.18) 18%,
-      transparent 32%
+      rgba(255, 248, 220, 0.95) 0%,
+      rgba(255, 235, 190, 0.45) 4%,
+      rgba(255, 220, 160, 0.12) 14%,
+      transparent 28%
     ),
     radial-gradient(
-      ellipse 55% 0.8% at center,
-      rgba(255, 250, 225, 1) 0%,
-      rgba(255, 240, 200, 0.75) 22%,
-      rgba(255, 225, 160, 0.30) 55%,
-      transparent 95%
+      ellipse 50% 0.5% at center,
+      rgba(255, 242, 215, 1) 0%,
+      rgba(255, 232, 185, 0.55) 18%,
+      rgba(255, 218, 155, 0.18) 50%,
+      transparent 92%
     ),
     radial-gradient(
-      ellipse 0.8% 55% at center,
-      rgba(255, 250, 225, 1) 0%,
-      rgba(255, 240, 200, 0.75) 22%,
-      rgba(255, 225, 160, 0.30) 55%,
-      transparent 95%
-    ),
-    radial-gradient(
-      ellipse 50% 0.35% at center,
-      rgba(255, 252, 235, 1) 0%,
-      rgba(255, 245, 205, 0.85) 30%,
-      rgba(255, 230, 170, 0.25) 65%,
-      transparent 95%
-    ),
-    radial-gradient(
-      ellipse 0.35% 50% at center,
-      rgba(255, 252, 235, 1) 0%,
-      rgba(255, 245, 205, 0.85) 30%,
-      rgba(255, 230, 170, 0.25) 65%,
-      transparent 95%
+      ellipse 0.5% 50% at center,
+      rgba(255, 242, 215, 1) 0%,
+      rgba(255, 232, 185, 0.55) 18%,
+      rgba(255, 218, 155, 0.18) 50%,
+      transparent 92%
     );
   filter: blur(1.2px);
+}
+
+/* Mobile starburst: bigger footprint + brighter 5-layer gradient.
+   Portrait mobile needs more visual punch from the spikes because
+   it doesn't have the wide ghost chain that desktop relies on for
+   spectacle. Two extra ellipse layers (0.35% inner ridge) give
+   the spikes a bright core line inside a softer halo. */
+@media (max-width: 900px) {
+  .sun-flare__starburst {
+    width: 28vmax;
+    height: 28vmax;
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(255, 250, 230, 1) 0%,
+        rgba(255, 245, 210, 0.85) 3%,
+        rgba(255, 235, 185, 0.45) 8%,
+        rgba(255, 222, 160, 0.18) 18%,
+        transparent 32%
+      ),
+      radial-gradient(
+        ellipse 55% 0.8% at center,
+        rgba(255, 250, 225, 1) 0%,
+        rgba(255, 240, 200, 0.75) 22%,
+        rgba(255, 225, 160, 0.30) 55%,
+        transparent 95%
+      ),
+      radial-gradient(
+        ellipse 0.8% 55% at center,
+        rgba(255, 250, 225, 1) 0%,
+        rgba(255, 240, 200, 0.75) 22%,
+        rgba(255, 225, 160, 0.30) 55%,
+        transparent 95%
+      ),
+      radial-gradient(
+        ellipse 50% 0.35% at center,
+        rgba(255, 252, 235, 1) 0%,
+        rgba(255, 245, 205, 0.85) 30%,
+        rgba(255, 230, 170, 0.25) 65%,
+        transparent 95%
+      ),
+      radial-gradient(
+        ellipse 0.35% 50% at center,
+        rgba(255, 252, 235, 1) 0%,
+        rgba(255, 245, 205, 0.85) 30%,
+        rgba(255, 230, 170, 0.25) 65%,
+        transparent 95%
+      );
+  }
 }
 
 /* ---------- Peak tint ----------
