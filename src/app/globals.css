@@ -1075,11 +1075,11 @@ body {
 }
 
 /* ---------- Music toggle ---------- */
-/* Appears once the user has tapped (the gesture that unlocks audio).
-   Top-right corner, small, semi-transparent — a control, not a feature.
-   Fades in gently so it doesn't pop into view the moment the ritual
-   starts; by the time it's fully visible the user is settling into
-   witness mode and might want it. */
+/* Glass treatment — no fill, no border, no backdrop blur. Just the
+   icon floating in the void, faint enough to almost disappear into
+   the starfield. Sits in the cosmos, doesn't sit *on* it. The icon
+   itself is muted by default and warms up on hover so it can be
+   found by anyone reaching for it. */
 
 .music-toggle {
   position: fixed;
@@ -1092,35 +1092,28 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: rgba(14, 16, 22, 0.42);
-  border: 1px solid rgba(212, 218, 226, 0.12);
-  border-radius: 50%;
-  color: rgba(212, 218, 226, 0.55);
+  background: transparent;
+  border: 0;
+  color: rgba(212, 218, 226, 0.32);
   cursor: pointer;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
   transition:
-    color 240ms ease,
-    background 240ms ease,
-    border-color 240ms ease,
+    color 320ms ease,
     transform 240ms ease;
   opacity: 0;
-  animation: music-toggle-in 1200ms ease 1200ms forwards;
+  animation: music-toggle-in 1600ms ease 1400ms forwards;
 }
 
 .music-toggle:hover {
-  color: rgba(232, 236, 242, 0.92);
-  background: rgba(20, 22, 30, 0.6);
-  border-color: rgba(212, 218, 226, 0.22);
+  color: rgba(232, 236, 242, 0.78);
 }
 
 .music-toggle:focus-visible {
-  outline: 2px solid rgba(212, 218, 226, 0.4);
-  outline-offset: 2px;
+  outline: none;
+  color: rgba(232, 236, 242, 0.78);
 }
 
 .music-toggle:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
 }
 
 @keyframes music-toggle-in {
