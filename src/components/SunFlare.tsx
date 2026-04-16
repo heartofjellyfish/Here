@@ -233,6 +233,17 @@ export default function SunFlare() {
     // gentle "fresh dawn" each time.
     const clockStart = performance.now();
 
+    // Mobile ray boost. On mobile we strip the SVG turbulence filter
+    // for perf (see globals.css @media rule), which also removes its
+    // visual amplification — clean conic rays at ~0.36 peak alpha
+    // read as "faint wash" rather than "god rays." Bumping the alpha
+    // here restores the spectacle without re-paying turbulence cost.
+    // Landscape desktop viewports get 1.0 (unchanged).
+    const isMobileLike =
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 900px)").matches;
+    const rayAlphaMult = isMobileLike ? 1.9 : 1.0;
+
     let raf = 0;
 
     const tick = () => {
@@ -308,8 +319,16 @@ export default function SunFlare() {
       // the same waypoint table; the zenith Y was patched at mount
       // to match the earth center.
       if (sunGlowRef.current) {
+        // X uses vmax (not vw) so the sun sweeps the full "long-axis"
+        // distance on any aspect ratio. On landscape viewports vmax === vw
+        // so this is a no-op; on mobile portrait vmax === vh, and the
+        // horizontal arc expands from a cramped ±vw band into a proper
+        // ±vh sweep. Keeps the glow's rise/set timing feeling like a
+        // real horizon-to-horizon traverse instead of a narrow vertical
+        // slot. Y stays in vh because the zenith-patching math and the
+        // earth's measured center are both in vh space.
         sunGlowRef.current.style.transform =
-          `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh)`;
+          `translate(${rawSx.toFixed(2)}vmax, ${rawSy.toFixed(2)}vh)`;
         sunGlowRef.current.style.opacity = Math.max(
           0,
           Math.min(1, sunAlpha),
@@ -432,7 +451,7 @@ export default function SunFlare() {
         // transform-origin (center by default), so the ghost grows
         // from its own center, not a corner.
         el.style.transform =
-          `translate(${gx.toFixed(2)}vw, ${gy.toFixed(2)}vh) ` +
+          `translate(${gx.toFixed(2)}vmax, ${gy.toFixed(2)}vh) ` +
           `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
         el.style.opacity = Math.max(0, Math.min(1, alpha)).toFixed(3);
 
@@ -481,7 +500,7 @@ export default function SunFlare() {
         const burstScale = 0.8 + defocus * 0.9;
         const burstRot = (now * 0.006) % 360;
         starburstRef.current.style.transform =
-          `translate(${bx.toFixed(2)}vw, ${by.toFixed(2)}vh) ` +
+          `translate(${bx.toFixed(2)}vmax, ${by.toFixed(2)}vh) ` +
           `translate(-50%, -50%) ` +
           `rotate(${burstRot.toFixed(2)}deg) scale(${burstScale.toFixed(3)})`;
         starburstRef.current.style.opacity = Math.max(0, Math.min(1, burstAlpha)).toFixed(3);
@@ -521,7 +540,7 @@ export default function SunFlare() {
           0.12 * Math.sin(now * 0.00031) +
           0.09 * Math.sin(now * 0.00073 + 1.7) +
           0.06 * Math.sin(now * 0.0013 + 3.1);
-        const rayAlpha = rayEnv * 0.28 * rayBreath;
+        const rayAlpha = rayEnv * 0.28 * rayBreath * rayAlphaMult;
         // Rays fan omnidirectionally from the sun. Rotation is a
         // slow continuous drift (~360°/min) *plus* a small wobble
         // on an independent sine so it doesn't feel like a steady
@@ -530,7 +549,7 @@ export default function SunFlare() {
         const rayRot =
           (now * 0.006 + 8 * Math.sin(now * 0.00047)) % 360;
         godRaysRef.current.style.transform =
-          `translate(${rawSx.toFixed(2)}vw, ${rawSy.toFixed(2)}vh) ` +
+          `translate(${rawSx.toFixed(2)}vmax, ${rawSy.toFixed(2)}vh) ` +
           `translate(-50%, -50%) ` +
           `rotate(${rayRot.toFixed(2)}deg)`;
         godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
@@ -599,8 +618,12 @@ export default function SunFlare() {
             {
               "--ghost-hue": g.hue,
               "--ghost-blur": `${g.blur}px`,
-              width: `${g.size}vw`,
-              height: `${g.size}vw`,
+              // vmax so ghost sizes don't collapse on mobile portrait.
+              // Landscape: vmax === vw (unchanged). Portrait: vmax === vh,
+              // so a 13-unit ghost on mobile goes from ~49px → ~106px —
+              // big enough to read as a lens reflection rather than a dot.
+              width: `${g.size}vmax`,
+              height: `${g.size}vmax`,
             } as React.CSSProperties
           }
         />

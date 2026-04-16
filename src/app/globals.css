@@ -312,16 +312,13 @@ body {
    surface in the scene — a full-viewport+ radial gradient with
    filter: blur running through mobile GPUs struggles near peak
    opacity. Mobile DPR (2–3×) already hides the banding that blur
-   was dithering on desktop, so dropping blur here is almost a no-op
-   visually. Same for the god rays — readable on desktop, but on a
-   small screen the fine angular structure barely parses; the perf
-   they cost during their 38–54% window isn't worth what they add. */
+   was dithering on desktop, so dropping blur here is almost a
+   no-op visually. The matching override for .sun-flare__rays
+   lives right after its base rule below (source order matters:
+   same-specificity rule that comes later wins). */
 @media (max-width: 900px) {
   .sun-glow {
     filter: none;
-  }
-  .sun-flare__rays {
-    display: none;
   }
 }
 
@@ -555,6 +552,19 @@ body {
      sweet spot: enough softness that edges feather, not so much
      that the ray structure dissolves. */
   filter: url(#sun-flare-rays-turbulence) blur(1.8px);
+}
+
+/* Mobile perf: god rays stay visible — they carry the "奇观" at
+   peak and the user called them out as essential — but the SVG
+   turbulence (feTurbulence + feDisplacementMap) is the real cost,
+   not the conic gradients. Dropping the url(#…) filter and keeping
+   just the blur gives us CSS-clean rays (no fuzzy displacement) at
+   a fraction of the GPU cost. Mobile loses the "毛毛躁躁" texture;
+   it keeps the radiating light pattern. */
+@media (max-width: 900px) {
+  .sun-flare__rays {
+    filter: blur(1.8px);
+  }
 }
 
 .sun-flare__starburst {
