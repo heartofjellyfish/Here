@@ -295,12 +295,19 @@ body {
   );
   opacity: 0;
   /* Heavy blur on the 240vmax disc smooths the radial stops into
-     a continuous falloff. Without enough blur the sharper high-
-     alpha stops near the core become visible as concentric rings
-     when the overall element opacity is low (sunrise/sunset).
-     12px is tuned to the current stop density: reduce if the
-     hot core looks too diffuse at peak. */
-  filter: blur(12px);
+     a continuous falloff. At low DPR (desktop 1×) the 8-bit color
+     depth × huge gradient radius produces visible concentric
+     "banding rings" that shift with every per-frame transform —
+     reads as rippling water. Mobile DPR 2-3× hides this naturally
+     because the physical pixel density is higher. 24px blur on
+     desktop matches what mobile's high DPR does for free.
+     `will-change` promotes the element to its own compositor
+     layer so the blur is rasterized ONCE into a texture; the
+     per-frame transform/opacity updates just recomposite the
+     cached texture without re-running the blur. Without this,
+     some browsers re-blur on every style mutation. */
+  filter: blur(24px);
+  will-change: transform, opacity, filter;
   /* Position and opacity are now driven per-frame by SunFlare.tsx's
      RAF tick — same waypoint table, same 153s cycle, but the zenith Y
      is patched at mount to match the earth's measured center so the
