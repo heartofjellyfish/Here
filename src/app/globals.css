@@ -1103,27 +1103,36 @@ body {
   animation: music-toggle-in 2200ms ease 1400ms forwards;
 }
 
-/* Speaker icon stays invisible during the starburst — the user sees
-   a star first, then the star fades and the speaker pops in bright
-   (matching the starburst warmth), flashes once, and settles to its
-   ghost state. Delay is tuned so the icon arrives right as the rays
-   collapse (~3.3s after mount). */
+/* Speaker icon starts invisible, then emerges from the fading star
+   rays — no gap between the two. The icon begins fading in while
+   the rays are still bright (~2.4s), reaches its own flash peak as
+   the rays collapse (~3.2s), then slowly settles to ghost. The
+   overlap means the eye reads one continuous object (star → speaker)
+   rather than two sequential animations with a seam. */
 .music-toggle svg {
   opacity: 0;
-  animation: music-icon-in 1200ms ease 3300ms forwards;
+  animation: music-icon-in 2000ms ease 2400ms forwards;
 }
 
 @keyframes music-icon-in {
   0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.5;
+    filter: brightness(2.2)
+            drop-shadow(0 0 4px rgba(255, 248, 230, 0.6));
+  }
+  45% {
     opacity: 1;
     filter: brightness(2.8)
-            drop-shadow(0 0 5px rgba(255, 248, 230, 0.75))
+            drop-shadow(0 0 6px rgba(255, 248, 230, 0.75))
             drop-shadow(0 0 14px rgba(255, 248, 230, 0.3));
   }
-  40% {
+  70% {
     opacity: 1;
-    filter: brightness(1.4)
-            drop-shadow(0 0 2px rgba(255, 248, 230, 0.2));
+    filter: brightness(1.3)
+            drop-shadow(0 0 2px rgba(255, 248, 230, 0.15));
   }
   100% {
     opacity: 1;
