@@ -198,6 +198,14 @@ export default function SunFlare() {
   const starburstRef = useRef<HTMLDivElement | null>(null);
   const godRaysRef = useRef<HTMLDivElement | null>(null);
   const sunGlowRef = useRef<HTMLDivElement | null>(null);
+  const peakFlashRef = useRef<HTMLDivElement | null>(null);
+  const peakTintRef = useRef<HTMLDivElement | null>(null);
+  // Accumulator for starburst rotation. Can't just use `now * speed`
+  // because the speed varies (accelerates near peak) — scaling `now`
+  // by a changing factor would cause phase jumps. Integrating speed *
+  // dt per tick keeps rotation smooth across speed changes.
+  const burstRotAccumRef = useRef(0);
+  const lastTickMsRef = useRef<number | null>(null);
   // Mutable copy of waypoints — the entire arc is shifted vertically
   // at mount so the zenith aligns with the earth's measured center.
   const waypointsRef = useRef<number[][]>(
@@ -485,6 +493,16 @@ export default function SunFlare() {
       // dramatically as the sun approaches the optical axis —
       // that's the "奇观" moment where the lens is staring
       // directly into the source.
+      // Starburst rotation accumulator — speed ramps up as the sun
+      // approaches the optical axis. Base 0.006 deg/ms (≈1 rot/min),
+      // scaled up to ~4× at dead-center. Integrated per tick (not
+      // `now × speed`) so the varying multiplier doesn't cause phase
+      // jumps when defocus changes frame to frame.
+      const tickDt = lastTickMsRef.current == null ? 16 : now - lastTickMsRef.current;
+      lastTickMsRef.current = now;
+      const burstRotSpeed = 0.006 * (1 + defocus * 3);
+      burstRotAccumRef.current = (burstRotAccumRef.current + tickDt * burstRotSpeed) % 360;
+
       if (starburstRef.current) {
         // Position at the sun. Use the raw sun coords (not the
         // camera-drifted ones) because the starburst *is* on the
@@ -498,7 +516,7 @@ export default function SunFlare() {
         // shape, so no extra pow() needed here.
         const burstAlpha = burstEnvelope * (0.35 + defocus * 0.65);
         const burstScale = 0.8 + defocus * 0.9;
-        const burstRot = (now * 0.006) % 360;
+        const burstRot = burstRotAccumRef.current;
         starburstRef.current.style.transform =
           `translate(${bx.toFixed(2)}vmax, ${by.toFixed(2)}vh) ` +
           `translate(-50%, -50%) ` +
@@ -553,6 +571,30 @@ export default function SunFlare() {
           `translate(-50%, -50%) ` +
           `rotate(${rayRot.toFixed(2)}deg)`;
         godRaysRef.current.style.opacity = Math.max(0, Math.min(1, rayAlpha)).toFixed(3);
+      }
+
+      // --- Peak flash ---
+      // A sharp gaussian blip of near-white overlay centered exactly
+      // on zenith. Reads as "the camera is briefly overexposed by the
+      // sun aligning with the lens" — a pure cinematic moment marker.
+      // Sigma ~1.4% cycle → ~2.1s half-life, so the flash is felt as
+      // a punctuation point rather than a sustained white wash.
+      if (peakFlashRef.current) {
+        const dPct = cyclePct - FLARE_WINDOW_PEAK;
+        const flashEnv = Math.exp(-(dPct * dPct) / 4);
+        peakFlashRef.current.style.opacity = (flashEnv * 0.10).toFixed(3);
+      }
+
+      // --- Peak tint (color grade) ---
+      // Wider gaussian — the scene warms into and out of peak over
+      // ~12s either side. soft-light blend on the element (see CSS)
+      // punches saturation and warmth where the tint has color. Subtle
+      // enough to register as "golden hour" atmosphere rather than an
+      // obvious filter.
+      if (peakTintRef.current) {
+        const dPct = cyclePct - FLARE_WINDOW_PEAK;
+        const tintEnv = Math.exp(-(dPct * dPct) / 60);
+        peakTintRef.current.style.opacity = (tintEnv * 0.55).toFixed(3);
       }
 
       raf = requestAnimationFrame(tick);
@@ -629,6 +671,15 @@ export default function SunFlare() {
         />
       ))}
     </div>
+    {/* Peak tint — warm soft-light grade that bathes the scene in
+        golden-hour color for ~±12s around zenith. Sits above the
+        flare layer so it grades the composed image, not just the
+        background. */}
+    <div ref={peakTintRef} className="peak-tint" aria-hidden="true" />
+    {/* Peak flash — sharp near-white overlay, top of the stack.
+        Half-life ~2s, peak alpha ~0.10. Marks the exact zenith
+        instant like a camera overexposing. */}
+    <div ref={peakFlashRef} className="peak-flash" aria-hidden="true" />
     </>
   );
 }

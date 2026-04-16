@@ -571,45 +571,106 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 32vw;
-  height: 32vw;
+  /* vmax so mobile portrait (where vmax === vh) gets the full
+     long-axis reach instead of being squashed to 32vw ≈ 120px.
+     Landscape (vmax === vw) is unchanged. */
+  width: 40vmax;
+  height: 40vmax;
   opacity: 0;
   will-change: transform, opacity;
   /* Horizontal + vertical hairline: two linear gradients crossed
      at right angles. Each is bright-at-midline, fading to
      transparent at the ends. Inner hot core comes from a small
      radial gradient layered on top. */
-  /* Three stacked radial-gradient layers:
-     1. A hot near-white core (the sun-through-aperture hotspot)
-     2. A very thin horizontal ellipse (the horizontal spike)
-     3. A very thin vertical ellipse (the vertical spike)
-     Stacked as additive warmth via the container's screen blend.
+  /* Four stacked radial-gradient layers:
+     1. A hot near-white core (the sun-through-aperture hotspot) —
+        wider and more saturated than before so the starburst reads
+        as an overexposed sun disc, not just a cross.
+     2. A horizontal ellipse spike (thin cross-axis, long reach).
+     3. A vertical ellipse spike.
+     4. A second pair of spikes at 0.8% thickness overlaid on top —
+        gives the spikes a brighter inner line, like how a real
+        8-bladed aperture concentrates light in the center of each
+        spike. Reads as "thin bright ridge inside a softer halo"
+        instead of a single hairline.
      The ellipses use tiny cross-axis radii (0.5%) so each spike
-     is a hairline band, and large long-axis radii (50%) so the
-     spike reaches to the edge of the starburst box. */
+     is a hairline band, and large long-axis radii (55%) so the
+     spike reaches past the edge of the starburst box. */
   background:
     radial-gradient(
       circle at center,
-      rgba(255, 248, 220, 0.95) 0%,
-      rgba(255, 235, 190, 0.45) 4%,
-      rgba(255, 220, 160, 0.12) 14%,
-      transparent 28%
+      rgba(255, 250, 230, 1) 0%,
+      rgba(255, 245, 210, 0.85) 3%,
+      rgba(255, 235, 185, 0.45) 8%,
+      rgba(255, 222, 160, 0.18) 18%,
+      transparent 32%
     ),
     radial-gradient(
-      ellipse 50% 0.5% at center,
-      rgba(255, 242, 215, 1) 0%,
-      rgba(255, 232, 185, 0.55) 18%,
-      rgba(255, 218, 155, 0.18) 50%,
-      transparent 92%
+      ellipse 55% 0.8% at center,
+      rgba(255, 250, 225, 1) 0%,
+      rgba(255, 240, 200, 0.75) 22%,
+      rgba(255, 225, 160, 0.30) 55%,
+      transparent 95%
     ),
     radial-gradient(
-      ellipse 0.5% 50% at center,
-      rgba(255, 242, 215, 1) 0%,
-      rgba(255, 232, 185, 0.55) 18%,
-      rgba(255, 218, 155, 0.18) 50%,
-      transparent 92%
+      ellipse 0.8% 55% at center,
+      rgba(255, 250, 225, 1) 0%,
+      rgba(255, 240, 200, 0.75) 22%,
+      rgba(255, 225, 160, 0.30) 55%,
+      transparent 95%
+    ),
+    radial-gradient(
+      ellipse 50% 0.35% at center,
+      rgba(255, 252, 235, 1) 0%,
+      rgba(255, 245, 205, 0.85) 30%,
+      rgba(255, 230, 170, 0.25) 65%,
+      transparent 95%
+    ),
+    radial-gradient(
+      ellipse 0.35% 50% at center,
+      rgba(255, 252, 235, 1) 0%,
+      rgba(255, 245, 205, 0.85) 30%,
+      rgba(255, 230, 170, 0.25) 65%,
+      transparent 95%
     );
   filter: blur(1.2px);
+}
+
+/* ---------- Peak tint ----------
+   Warm radial grade centered on the sun at zenith. soft-light blend
+   punches saturation and warmth in the image underneath without
+   obvious wash — the scene reads as "golden hour" for a few seconds
+   either side of peak. JS drives opacity from a wide gaussian around
+   the zenith instant. */
+.peak-tint {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  will-change: opacity;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 210, 140, 0.9) 0%,
+    rgba(255, 195, 125, 0.65) 40%,
+    rgba(255, 180, 110, 0.35) 70%,
+    rgba(200, 130, 70, 0.1) 100%
+  );
+  mix-blend-mode: soft-light;
+}
+
+/* ---------- Peak flash ----------
+   Near-white overlay that spikes briefly at zenith. Sits above grain
+   and everything else so it acts as a camera-overexposure marker on
+   the final composed frame. JS drives a sharp gaussian opacity spike. */
+.peak-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  will-change: opacity;
+  background: rgba(255, 250, 235, 1);
 }
 
 /* ---------- Film grain ----------
