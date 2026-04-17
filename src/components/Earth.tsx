@@ -414,7 +414,7 @@ function fibSphere(n: number): Dot[] {
 
 function latLonToVec(lat: number, lon: number): [number, number, number] {
   const la = (lat * Math.PI) / 180;
-  const lo = (lon * Math.PI) / 180;
+  const lo = -(lon * Math.PI) / 180;
   return [
     Math.cos(la) * Math.cos(lo),
     Math.sin(la),
@@ -917,13 +917,12 @@ export default function Earth({
     const homeHalf = homeSprite.width / 2;
 
     // --- Moon sprite ---
-    // Phase-dependent alpha folded into globalAlpha. The inner gradient
-    // offset (litDx/litDy) changes per frame, but the moon is tiny
-    // (4.2px radius) so centering the baked gradient is visually
-    // identical. Color stops baked at phase=1.
-    const MOON_R = 4.2 * dpr;
+    // Moon sized at 8% of earth diameter — artistically enlarged from
+    // the real 27.3% (which is too big for this scene) but no longer a
+    // featureless dot.
+    const MOON_R = R * 0.08;
     const moonSprite = (() => {
-      const pad = 1;
+      const pad = 2;
       const dim = Math.ceil(MOON_R * 2 + pad * 2);
       const c = document.createElement("canvas");
       c.width = dim;
@@ -931,14 +930,50 @@ export default function Earth({
       const sctx = c.getContext("2d");
       if (!sctx) return c;
       const sc = dim / 2;
+
+      // Base radial gradient — warm grey lunar surface.
       const grad = sctx.createRadialGradient(sc, sc, 0, sc, sc, MOON_R);
-      grad.addColorStop(0, `rgba(232, 226, 214, 0.78)`);
-      grad.addColorStop(0.7, `rgba(180, 178, 172, 0.48)`);
+      grad.addColorStop(0, `rgba(232, 226, 214, 0.82)`);
+      grad.addColorStop(0.55, `rgba(200, 196, 188, 0.65)`);
+      grad.addColorStop(0.85, `rgba(160, 158, 152, 0.40)`);
       grad.addColorStop(1, "rgba(120, 120, 120, 0)");
       sctx.fillStyle = grad;
       sctx.beginPath();
       sctx.arc(sc, sc, MOON_R, 0, Math.PI * 2);
       sctx.fill();
+
+      // Craters — a handful of subtle dark spots at fixed positions,
+      // clipped to the moon disc. Cheap and deterministic.
+      sctx.save();
+      sctx.beginPath();
+      sctx.arc(sc, sc, MOON_R * 0.92, 0, Math.PI * 2);
+      sctx.clip();
+      const craters: [number, number, number, number][] = [
+        // [dx, dy, radius, alpha] — offsets from center as fraction of MOON_R
+        [-0.35, -0.25, 0.18, 0.12],
+        [0.20, -0.40, 0.14, 0.10],
+        [-0.10, 0.30, 0.22, 0.14],
+        [0.40, 0.15, 0.12, 0.09],
+        [-0.45, 0.10, 0.10, 0.08],
+        [0.05, -0.10, 0.16, 0.11],
+        [0.30, -0.15, 0.09, 0.07],
+        [-0.20, -0.50, 0.11, 0.08],
+      ];
+      for (const [dx, dy, cr, ca] of craters) {
+        const cx2 = sc + dx * MOON_R;
+        const cy2 = sc + dy * MOON_R;
+        const r2 = cr * MOON_R;
+        const cg = sctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, r2);
+        cg.addColorStop(0, `rgba(80, 78, 74, ${ca})`);
+        cg.addColorStop(0.6, `rgba(100, 98, 92, ${ca * 0.5})`);
+        cg.addColorStop(1, `rgba(120, 118, 112, 0)`);
+        sctx.fillStyle = cg;
+        sctx.beginPath();
+        sctx.arc(cx2, cy2, r2, 0, Math.PI * 2);
+        sctx.fill();
+      }
+      sctx.restore();
+
       return c;
     })();
     const moonHalf = moonSprite.width / 2;
