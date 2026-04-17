@@ -1144,20 +1144,26 @@ export default function Earth({
               if (wz < earthZ) continue;
             }
 
+            // Skip ~25% of dots randomly (deterministic per dot) to
+            // create a pockmarked, cratered feel. Mare dots skip more
+            // (40%) so the dark patches look eroded / pitted.
+            const skipThresh = md.terrain <= 1 ? 0.40 : 0.25;
+            if (md.seed < skipThresh) continue;
+
             const dsx = moonSx + MOON_R * md.x;
             const dsy = moonSy - MOON_R * md.y;
-            // Terrain contrast via dot size and color — no alpha
-            // games, which make dots vanish on small dark screens.
+            // Subdued colors — moon is backdrop, not focal point.
+            // Dot size varies by terrain for subtle texture.
             let color: string;
             let dotSize: number;
             switch (md.terrain) {
-              case 0:  color = "rgb(100, 100, 106)"; dotSize = 0.45 * dpr; break;
-              case 1:  color = "rgb(130, 128, 124)"; dotSize = 0.55 * dpr; break;
-              case 3:  color = "rgb(210, 208, 202)"; dotSize = 0.85 * dpr; break;
-              default: color = "rgb(160, 158, 152)"; dotSize = 0.65 * dpr; break;
+              case 0:  color = "rgb(80, 80, 85)"; dotSize = 0.40 * dpr; break;
+              case 1:  color = "rgb(100, 98, 95)"; dotSize = 0.50 * dpr; break;
+              case 3:  color = "rgb(155, 152, 148)"; dotSize = 0.70 * dpr; break;
+              default: color = "rgb(120, 118, 114)"; dotSize = 0.55 * dpr; break;
             }
             ctx.fillStyle = color;
-            ctx.globalAlpha = 0.50;
+            ctx.globalAlpha = 0.40;
             ctx.fillRect(dsx - dotSize / 2, dsy - dotSize / 2, dotSize, dotSize);
         }
         ctx.globalAlpha = 1;
