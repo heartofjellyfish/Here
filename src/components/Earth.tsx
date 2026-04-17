@@ -916,6 +916,11 @@ export default function Earth({
     })();
     const homeHalf = homeSprite.width / 2;
 
+    const cx = BUF / 2;
+    const cy = BUF / 2;
+    // Leave space for the moon's orbit inside the canvas.
+    const R = (BUF / 2) / 1.55;
+
     // --- Moon sprite ---
     // Moon sized at 8% of earth diameter — artistically enlarged from
     // the real 27.3% (which is too big for this scene) but no longer a
@@ -979,10 +984,6 @@ export default function Earth({
     const moonHalf = moonSprite.width / 2;
 
     const dots = fibSphere(3600);
-    const cx = BUF / 2;
-    const cy = BUF / 2;
-    // Leave space for the moon's orbit inside the canvas.
-    const R = (BUF / 2) / 1.55;
     const COS_T = Math.cos(TILT);
     const SIN_T = Math.sin(TILT);
     const MOON_COS = Math.cos(MOON_TILT);
