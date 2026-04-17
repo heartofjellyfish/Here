@@ -43,13 +43,14 @@ const BASE_WAYPOINTS: ReadonlyArray<readonly [number, number, number, number]> =
   // Whole pre-peak arc compressed ×0.92 for a brisker dawn — the
   // rise feels ~8% faster from horizon to mid-sky. Peak stays
   // locked at 46% so flare-chain sync, starburst timing, and the
-  // JS-driven ghost convergence don't shift. The small slowdown
-  // that this creates on the last mid→peak segment is masked by
-  // the sun's near-unity opacity there (already reads as "bright
-  // and climbing").
+  // JS-driven ghost convergence don't shift. An extra waypoint at
+  // 37% splits the long 28.5→46 gap (which was 17.5% cycle ≈ 27s
+  // for only 12vw of travel — a very visible deceleration) into
+  // two ~9% segments of even speed.
   [15.2, -36, 10, 0.48],
   [22.1, -24, 0, 0.66],
   [28.5, -12, -8, 0.86],
+  [37, -6, -10.5, 0.93],
   [46, 0, -13, 1],
   [54, 13, -9, 0.82],
   [61, 26, -1, 0.62],
@@ -226,7 +227,7 @@ export default function SunFlare() {
     // The earth slides there on tap (see Scene.tsx), so at zenith
     // sun = earth = optical center → ghost chain converges on the
     // globe with physically correct optics.
-    const originalZenithY = BASE_WAYPOINTS[8][2]; // -13
+    const originalZenithY = BASE_WAYPOINTS[9][2]; // -13
     const delta = 0 - originalZenithY;
     for (let i = 0; i < waypointsRef.current.length; i++) {
       waypointsRef.current[i][2] = BASE_WAYPOINTS[i][2] + delta;
