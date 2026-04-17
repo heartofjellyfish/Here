@@ -921,67 +921,42 @@ export default function Earth({
     // Leave space for the moon's orbit inside the canvas.
     const R = (BUF / 2) / 1.55;
 
-    // --- Moon sprite ---
-    // Moon sized at 8% of earth diameter — artistically enlarged from
-    // the real 27.3% (which is too big for this scene) but no longer a
-    // featureless dot.
+    // --- Moon as a dot-sphere (same visual language as earth) ---
+    // 8% of earth diameter, 300 fibonacci dots. Some dots fall inside
+    // "mare" regions and render darker, giving the familiar patchwork.
     const MOON_R = R * 0.08;
-    const moonSprite = (() => {
-      const pad = 2;
-      const dim = Math.ceil(MOON_R * 2 + pad * 2);
-      const c = document.createElement("canvas");
-      c.width = dim;
-      c.height = dim;
-      const sctx = c.getContext("2d");
-      if (!sctx) return c;
-      const sc = dim / 2;
-
-      // Base radial gradient — warm grey lunar surface.
-      const grad = sctx.createRadialGradient(sc, sc, 0, sc, sc, MOON_R);
-      grad.addColorStop(0, `rgba(232, 226, 214, 0.82)`);
-      grad.addColorStop(0.55, `rgba(200, 196, 188, 0.65)`);
-      grad.addColorStop(0.85, `rgba(160, 158, 152, 0.40)`);
-      grad.addColorStop(1, "rgba(120, 120, 120, 0)");
-      sctx.fillStyle = grad;
-      sctx.beginPath();
-      sctx.arc(sc, sc, MOON_R, 0, Math.PI * 2);
-      sctx.fill();
-
-      // Craters — a handful of subtle dark spots at fixed positions,
-      // clipped to the moon disc. Cheap and deterministic.
-      sctx.save();
-      sctx.beginPath();
-      sctx.arc(sc, sc, MOON_R * 0.92, 0, Math.PI * 2);
-      sctx.clip();
-      const craters: [number, number, number, number][] = [
-        // [dx, dy, radius, alpha] — offsets from center as fraction of MOON_R
-        [-0.35, -0.25, 0.18, 0.12],
-        [0.20, -0.40, 0.14, 0.10],
-        [-0.10, 0.30, 0.22, 0.14],
-        [0.40, 0.15, 0.12, 0.09],
-        [-0.45, 0.10, 0.10, 0.08],
-        [0.05, -0.10, 0.16, 0.11],
-        [0.30, -0.15, 0.09, 0.07],
-        [-0.20, -0.50, 0.11, 0.08],
+    type MoonDot = { x: number; y: number; z: number; mare: boolean };
+    const moonDots: MoonDot[] = (() => {
+      const n = 300;
+      const out: MoonDot[] = [];
+      const golden = Math.PI * (3 - Math.sqrt(5));
+      // Mare regions: (lat, lon, angularRadius) in radians.
+      // Loosely inspired by the real near-side maria.
+      const mares: [number, number, number][] = [
+        [0.15, 0.4, 0.38],    // Tranquillitatis-ish
+        [-0.18, -0.35, 0.30],  // Imbrium-ish
+        [0.35, -0.05, 0.22],  // Serenitatis-ish
+        [-0.30, 0.50, 0.24],  // Nubium-ish
+        [0.05, -0.65, 0.18],  // small patch
       ];
-      for (const [dx, dy, cr, ca] of craters) {
-        const cx2 = sc + dx * MOON_R;
-        const cy2 = sc + dy * MOON_R;
-        const r2 = cr * MOON_R;
-        const cg = sctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, r2);
-        cg.addColorStop(0, `rgba(80, 78, 74, ${ca})`);
-        cg.addColorStop(0.6, `rgba(100, 98, 92, ${ca * 0.5})`);
-        cg.addColorStop(1, `rgba(120, 118, 112, 0)`);
-        sctx.fillStyle = cg;
-        sctx.beginPath();
-        sctx.arc(cx2, cy2, r2, 0, Math.PI * 2);
-        sctx.fill();
+      for (let i = 0; i < n; i++) {
+        const y = 1 - (i / (n - 1)) * 2;
+        const r = Math.sqrt(Math.max(0, 1 - y * y));
+        const theta = golden * i;
+        const x = Math.cos(theta) * r;
+        const z = Math.sin(theta) * r;
+        const lat = Math.asin(y);
+        const lon = Math.atan2(z, x);
+        let mare = false;
+        for (const [mlat, mlon, mrad] of mares) {
+          const dl = lat - mlat;
+          const dp = lon - mlon;
+          if (dl * dl + dp * dp < mrad * mrad) { mare = true; break; }
+        }
+        out.push({ x, y, z, mare });
       }
-      sctx.restore();
-
-      return c;
+      return out;
     })();
-    const moonHalf = moonSprite.width / 2;
 
     const dots = fibSphere(3600);
     const COS_T = Math.cos(TILT);
@@ -1130,12 +1105,33 @@ export default function Earth({
         if (!occluded) {
           const moonSx = cx + R * mx;
           const moonSy = cy - R * my;
-          // Phase: shade by the same key light as the earth so they read
-          // as belonging to the same scene.
-          const lit = Math.max(0, LX * mx + LY * my + LZ * mz) / MOON_ORBIT_R;
-          const phase = 0.45 + 0.55 * lit;
-          ctx.globalAlpha = phase;
-          ctx.drawImage(moonSprite, moonSx - moonHalf, moonSy - moonHalf);
+          // Tidally locked: moon rotates once per orbit so the same
+          // face always points toward earth. We use the orbit angle
+          // as the moon's own Y-axis rotation.
+          const mCosR = Math.cos(moonAngle);
+          const mSinR = Math.sin(moonAngle);
+          const moonDotSize = 0.9 * dpr;
+
+          ctx.fillStyle = "rgba(220, 216, 206, 1)";
+          for (const md of moonDots) {
+            // Rotate around Y (tidal lock).
+            const dx1 = md.x * mCosR + md.z * mSinR;
+            const dz1 = -md.x * mSinR + md.z * mCosR;
+            const dy1 = md.y;
+            // Back-face cull — viewer is at +Z.
+            if (dz1 < -0.02) continue;
+            // Screen position relative to moon center.
+            const dsx = moonSx + MOON_R * dx1;
+            const dsy = moonSy - MOON_R * dy1;
+            // Lighting: same key light as earth.
+            const lam = Math.max(0, LX * dx1 + LY * dy1 + LZ * dz1);
+            const shade = 0.35 + 0.65 * lam;
+            // Limb darkening — dots near the edge fade.
+            const limb = Math.max(0, dz1);
+            const baseAlpha = md.mare ? 0.40 : 0.78;
+            ctx.globalAlpha = baseAlpha * shade * (0.4 + 0.6 * limb);
+            ctx.fillRect(dsx - moonDotSize / 2, dsy - moonDotSize / 2, moonDotSize, moonDotSize);
+          }
           ctx.globalAlpha = 1;
         }
       }
