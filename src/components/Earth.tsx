@@ -114,7 +114,7 @@ const LZ = 0.77;
 // Moon: small companion, slow orbit, 15° tilted plane.
 const MOON_PERIOD_MS = 540_000;
 const MOON_TILT = (15 * Math.PI) / 180;
-const MOON_ORBIT_R = 1.42; // in earth radii (so it sits comfortably outside)
+const MOON_ORBIT_R = 1.58; // in earth radii (so it sits comfortably outside)
 
 // ------ continent polygons ------
 //
@@ -922,9 +922,9 @@ export default function Earth({
     const R = (BUF / 2) / 1.55;
 
     // --- Moon as a dot-sphere (same visual language as earth) ---
-    // 8% of earth diameter, 300 fibonacci dots. Some dots fall inside
-    // "mare" regions and render darker, giving the familiar patchwork.
-    const MOON_R = R * 0.08;
+    // 10% of earth diameter, 500 fibonacci dots. Mare regions render
+    // as visibly darker/sparser patches against brighter highlands.
+    const MOON_R = R * 0.10;
     // Each moon dot carries a terrain type and a per-dot brightness
     // seed so the surface reads as textured, not a smooth ball.
     type MoonDot = {
@@ -935,7 +935,7 @@ export default function Earth({
       seed: number;
     };
     const moonDots: MoonDot[] = (() => {
-      const n = 300;
+      const n = 500;
       const out: MoonDot[] = [];
       const golden = Math.PI * (3 - Math.sqrt(5));
       // Mare regions: (lat, lon, outerRadius, innerRadius) in radians.
@@ -1125,14 +1125,12 @@ export default function Earth({
         // moon's radius is 0.08. Per-dot occlusion: each dot's world
         // position is checked against the earth's unit sphere so the
         // moon is properly hidden when passing behind the globe.
-        const MOON_R_UNIT = 0.08; // moon radius in earth-radii
+        const MOON_R_UNIT = 0.10; // moon radius in earth-radii
 
         const moonSx = cx + R * mx;
         const moonSy = cy - R * my;
         const mCosR = Math.cos(moonAngle);
         const mSinR = Math.sin(moonAngle);
-        const moonDotSize = 0.9 * dpr;
-
         for (const md of moonDots) {
             // Rotate around Y (tidal lock).
             const dx1 = md.x * mCosR + md.z * mSinR;
@@ -1153,28 +1151,27 @@ export default function Earth({
 
             const dsx = moonSx + MOON_R * dx1;
             const dsy = moonSy - MOON_R * dy1;
-            // Lighting + limb darkening.
             const lam = Math.max(0, LX * dx1 + LY * dy1 + LZ * dz1);
-            const shade = 0.30 + 0.70 * lam;
+            const shade = 0.25 + 0.75 * lam;
             const limb = Math.max(0, dz1);
-            // Per-dot jitter breaks up uniformity (±20% brightness).
-            const jitter = 0.80 + 0.40 * md.seed;
-            // Terrain-dependent alpha and color.
-            //   0 deep mare:  very dark, slightly blue-grey
-            //   1 mare edge:  medium dark
-            //   2 highland:   bright warm grey
-            //   3 crater rim: brightest, slight sparkle
+            const jitter = 0.75 + 0.50 * md.seed;
+            // Terrain drives alpha, color, AND dot size for strong contrast.
+            //   0 deep mare:  tiny dark dots — the "seas"
+            //   1 mare edge:  small medium dots — transition
+            //   2 highland:   normal bright dots — the bright terrain
+            //   3 crater rim: large bright dots — visual anchors
             let baseAlpha: number;
             let color: string;
+            let dotSize: number;
             switch (md.terrain) {
-              case 0:  baseAlpha = 0.14; color = "rgb(160, 162, 168)"; break;
-              case 1:  baseAlpha = 0.25; color = "rgb(180, 178, 174)"; break;
-              case 3:  baseAlpha = 0.62; color = "rgb(240, 236, 228)"; break;
-              default: baseAlpha = 0.45; color = "rgb(220, 216, 206)"; break;
+              case 0:  baseAlpha = 0.10; color = "rgb(130, 132, 140)"; dotSize = 0.55 * dpr; break;
+              case 1:  baseAlpha = 0.22; color = "rgb(165, 163, 158)"; dotSize = 0.70 * dpr; break;
+              case 3:  baseAlpha = 0.80; color = "rgb(245, 242, 234)"; dotSize = 1.15 * dpr; break;
+              default: baseAlpha = 0.52; color = "rgb(218, 214, 204)"; dotSize = 0.85 * dpr; break;
             }
             ctx.fillStyle = color;
-            ctx.globalAlpha = baseAlpha * shade * (0.35 + 0.65 * limb) * jitter;
-            ctx.fillRect(dsx - moonDotSize / 2, dsy - moonDotSize / 2, moonDotSize, moonDotSize);
+            ctx.globalAlpha = baseAlpha * shade * (0.30 + 0.70 * limb) * jitter;
+            ctx.fillRect(dsx - dotSize / 2, dsy - dotSize / 2, dotSize, dotSize);
         }
         ctx.globalAlpha = 1;
       }
