@@ -1151,26 +1151,26 @@ export default function Earth({
 
             const dsx = moonSx + MOON_R * dx1;
             const dsy = moonSy - MOON_R * dy1;
-            const lam = Math.max(0, LX * dx1 + LY * dy1 + LZ * dz1);
-            const shade = 0.25 + 0.75 * lam;
-            const limb = Math.max(0, dz1);
-            const jitter = 0.75 + 0.50 * md.seed;
-            // Terrain drives alpha, color, AND dot size for strong contrast.
-            //   0 deep mare:  tiny dark dots — the "seas"
-            //   1 mare edge:  small medium dots — transition
-            //   2 highland:   normal bright dots — the bright terrain
+            // No directional lighting on the moon — it's too small
+            // for shading to read as "phase"; it just eats half the
+            // dots. Terrain + jitter provide all the surface texture.
+            const jitter = 0.82 + 0.36 * md.seed;
+            // Terrain drives alpha, color, AND dot size for contrast.
+            //   0 deep mare:  smaller dark dots — the "seas"
+            //   1 mare edge:  medium dots — transition
+            //   2 highland:   normal bright dots
             //   3 crater rim: large bright dots — visual anchors
             let baseAlpha: number;
             let color: string;
             let dotSize: number;
             switch (md.terrain) {
-              case 0:  baseAlpha = 0.10; color = "rgb(130, 132, 140)"; dotSize = 0.55 * dpr; break;
-              case 1:  baseAlpha = 0.22; color = "rgb(165, 163, 158)"; dotSize = 0.70 * dpr; break;
-              case 3:  baseAlpha = 0.80; color = "rgb(245, 242, 234)"; dotSize = 1.15 * dpr; break;
-              default: baseAlpha = 0.52; color = "rgb(218, 214, 204)"; dotSize = 0.85 * dpr; break;
+              case 0:  baseAlpha = 0.30; color = "rgb(140, 142, 148)"; dotSize = 0.60 * dpr; break;
+              case 1:  baseAlpha = 0.45; color = "rgb(170, 168, 162)"; dotSize = 0.75 * dpr; break;
+              case 3:  baseAlpha = 0.90; color = "rgb(245, 242, 234)"; dotSize = 1.10 * dpr; break;
+              default: baseAlpha = 0.65; color = "rgb(218, 214, 204)"; dotSize = 0.85 * dpr; break;
             }
             ctx.fillStyle = color;
-            ctx.globalAlpha = baseAlpha * shade * (0.30 + 0.70 * limb) * jitter;
+            ctx.globalAlpha = baseAlpha * jitter;
             ctx.fillRect(dsx - dotSize / 2, dsy - dotSize / 2, dotSize, dotSize);
         }
         ctx.globalAlpha = 1;
