@@ -114,7 +114,7 @@ const LZ = 0.77;
 // Moon: small companion, slow orbit, 15° tilted plane.
 const MOON_PERIOD_MS = 540_000;
 const MOON_TILT = (15 * Math.PI) / 180;
-const MOON_ORBIT_R = 1.58; // in earth radii (so it sits comfortably outside)
+const MOON_ORBIT_R = 1.42; // in earth radii (fits inside canvas at R=BUF/2/1.55)
 
 // ------ continent polygons ------
 //
@@ -918,9 +918,8 @@ export default function Earth({
 
     const cx = BUF / 2;
     const cy = BUF / 2;
-    // Leave space for the moon's orbit + radius inside the canvas.
-    // Must be >= MOON_ORBIT_R + moon size (1.58 + 0.10 = 1.68).
-    const R = (BUF / 2) / 1.72;
+    // Leave space for the moon's orbit inside the canvas.
+    const R = (BUF / 2) / 1.55;
 
     // --- Moon as a dot-sphere (same visual language as earth) ---
     // 10% of earth diameter, 500 fibonacci dots. Mare regions render
@@ -1124,7 +1123,7 @@ export default function Earth({
         // moon's radius is 0.08. Per-dot occlusion: each dot's world
         // position is checked against the earth's unit sphere so the
         // moon is properly hidden when passing behind the globe.
-        const MOON_R_UNIT = 0.10; // moon radius in earth-radii
+        const MOON_R_UNIT = 0.10; // moon radius in earth-radii (orbit 1.42 + 0.10 < 1.55)
 
         const moonSx = cx + R * mx;
         const moonSy = cy - R * my;
