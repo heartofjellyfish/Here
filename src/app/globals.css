@@ -319,6 +319,25 @@ body {
 @media (max-width: 900px) {
   .sun-glow {
     filter: none;
+    /* Desktop uses blur(8px) to spread the gradient into a smooth
+       falloff that fully drowns the earth at peak. Mobile drops blur
+       for perf, so the gradient appears sharper and the hot core
+       reads smaller — earth edges poke out of the glow at zenith.
+       Fix: widen the inner stops so the bright disc covers more of
+       the radius (compensating for no-blur). Outer halo stays the
+       same so sunrise/sunset warmth doesn't change. */
+    background: radial-gradient(
+      closest-side,
+      rgba(255, 250, 230, 0.98) 0%,
+      rgba(255, 248, 222, 0.88) 10%,
+      rgba(255, 244, 210, 0.72) 22%,
+      rgba(255, 232, 185, 0.50) 38%,
+      rgba(255, 218, 160, 0.32) 52%,
+      rgba(255, 203, 145, 0.18) 66%,
+      rgba(255, 188, 128, 0.08) 80%,
+      rgba(255, 175, 115, 0.03) 92%,
+      transparent 100%
+    );
   }
 }
 
