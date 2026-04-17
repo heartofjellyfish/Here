@@ -96,6 +96,9 @@ type Props = {
   witnesses?: ReadonlyArray<Witness>;
   witnessTiming?: WitnessTiming;
   home?: Home | null;
+  /** Wall-clock timestamp (Date.now()) when the moon should start
+   *  emerging from behind the earth. Before this, it stays hidden. */
+  moonRevealAt?: number | null;
 };
 
 // ------ constants ------
@@ -584,6 +587,7 @@ export default function Earth({
   witnesses,
   witnessTiming,
   home = null,
+  moonRevealAt = null,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -595,6 +599,9 @@ export default function Earth({
     fadeMs: DEFAULT_WITNESS_FADE_MS,
   });
   if (witnessTiming) timingRef.current = witnessTiming;
+
+  const moonRevealAtRef = useRef<number | null>(null);
+  if (moonRevealAt != null) moonRevealAtRef.current = moonRevealAt;
 
   // Rotation is `baseRot(t) + rotOffset`. The ritual temporarily takes
   // over the rotation; on exit we write back to rotOffset so the idle
@@ -1104,11 +1111,12 @@ export default function Earth({
 
       // ------ moon (drawn AFTER the earth so it can pass in front, with
       //   true depth occlusion against the earth's spherical surface) ------
-      {
-        // Start the moon directly behind the earth (π/2 offset puts
-        // it at mz ≈ -1.37, fully occluded). It slowly orbits out and
-        // becomes visible — a quiet reveal after the sun peak passes.
-        const moonAngle = (t / MOON_PERIOD_MS) * Math.PI * 2 + Math.PI / 2;
+      // Moon stays hidden until moonRevealAt fires. Once triggered,
+      // it starts from behind the earth (π/2) and orbits out over
+      // ~135s (quarter orbit) — a quiet reveal.
+      if (moonRevealAtRef.current != null) {
+        const moonElapsed = Math.max(0, realNow - moonRevealAtRef.current);
+        const moonAngle = (moonElapsed / MOON_PERIOD_MS) * Math.PI * 2 + Math.PI / 2;
         // Pre-tilt position on a circle in the XZ plane. `mz0` is negated
         // so the moon orbits in the same screen-direction as the earth's
         // rotation (both surfaces move left-to-right across the front

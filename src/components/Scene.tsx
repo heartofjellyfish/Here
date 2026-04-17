@@ -484,6 +484,7 @@ export default function Scene({ lang }: { lang: Lang }) {
             witnesses={witnesses}
             witnessTiming={cfg.timing}
             home={home}
+            moonRevealAt={witnessActiveAt}
           />
         </div>
 
