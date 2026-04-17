@@ -112,7 +112,7 @@ const LY = -0.55;
 const LZ = 0.77;
 
 // Moon: small companion, slow orbit, 15° tilted plane.
-const MOON_PERIOD_MS = 240_000;
+const MOON_PERIOD_MS = 540_000;
 const MOON_TILT = (15 * Math.PI) / 180;
 const MOON_ORBIT_R = 1.42; // in earth radii (so it sits comfortably outside)
 
@@ -406,7 +406,7 @@ function fibSphere(n: number): Dot[] {
     const x = Math.cos(theta) * r;
     const z = Math.sin(theta) * r;
     const lat = (Math.asin(y) * 180) / Math.PI;
-    const lon = (Math.atan2(z, x) * 180) / Math.PI;
+    const lon = -(Math.atan2(z, x) * 180) / Math.PI;
     dots.push({ x, y, z, land: isLand(lat, lon) });
   }
   return dots;
