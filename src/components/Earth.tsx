@@ -1120,35 +1120,37 @@ export default function Earth({
         const my = -mz0 * MOON_SIN;
         const mz = mz0 * MOON_COS;
 
-        // True depth occlusion. The earth is a unit sphere centered at
-        // origin; at any (mx, my) inside the unit disc, its visible surface
-        // is at z = +sqrt(1 - mx² - my²). If the moon's z is *less* than
-        // that, the moon sits behind the earth's bulge and is hidden.
-        // Outside the unit disc the line of sight misses the earth, so
-        // the moon is always visible there.
-        const dInDisc2 = mx * mx + my * my;
-        let occluded = false;
-        if (dInDisc2 < 1) {
-          const earthZ = Math.sqrt(1 - dInDisc2);
-          if (mz < earthZ) occluded = true;
-        }
+        // Moon center in earth-radii coordinates: (mx, my, mz).
+        // Moon pixel-radius MOON_R = R * 0.08, so in earth-radii the
+        // moon's radius is 0.08. Per-dot occlusion: each dot's world
+        // position is checked against the earth's unit sphere so the
+        // moon is properly hidden when passing behind the globe.
+        const MOON_R_UNIT = 0.08; // moon radius in earth-radii
 
-        if (!occluded) {
-          const moonSx = cx + R * mx;
-          const moonSy = cy - R * my;
-          // Tidally locked: moon rotates once per orbit so the same
-          // face always points toward earth. We use the orbit angle
-          // as the moon's own Y-axis rotation.
-          const mCosR = Math.cos(moonAngle);
-          const mSinR = Math.sin(moonAngle);
-          const moonDotSize = 0.9 * dpr;
+        const moonSx = cx + R * mx;
+        const moonSy = cy - R * my;
+        const mCosR = Math.cos(moonAngle);
+        const mSinR = Math.sin(moonAngle);
+        const moonDotSize = 0.9 * dpr;
 
-          for (const md of moonDots) {
+        for (const md of moonDots) {
             // Rotate around Y (tidal lock).
             const dx1 = md.x * mCosR + md.z * mSinR;
             const dz1 = -md.x * mSinR + md.z * mCosR;
             const dy1 = md.y;
             if (dz1 < -0.02) continue;
+
+            // World position of this dot in earth-radii.
+            const wx = mx + dx1 * MOON_R_UNIT;
+            const wy = my + dy1 * MOON_R_UNIT;
+            const wz = mz + dz1 * MOON_R_UNIT;
+            // Occlude if this dot is behind the earth's surface.
+            const wd2 = wx * wx + wy * wy;
+            if (wd2 < 1) {
+              const earthZ = Math.sqrt(1 - wd2);
+              if (wz < earthZ) continue;
+            }
+
             const dsx = moonSx + MOON_R * dx1;
             const dsy = moonSy - MOON_R * dy1;
             // Lighting + limb darkening.
@@ -1173,9 +1175,8 @@ export default function Earth({
             ctx.fillStyle = color;
             ctx.globalAlpha = baseAlpha * shade * (0.35 + 0.65 * limb) * jitter;
             ctx.fillRect(dsx - moonDotSize / 2, dsy - moonDotSize / 2, moonDotSize, moonDotSize);
-          }
-          ctx.globalAlpha = 1;
         }
+        ctx.globalAlpha = 1;
       }
 
       // ------ ritual highlights ------
