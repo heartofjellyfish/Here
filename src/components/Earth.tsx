@@ -918,8 +918,9 @@ export default function Earth({
 
     const cx = BUF / 2;
     const cy = BUF / 2;
-    // Leave space for the moon's orbit inside the canvas.
-    const R = (BUF / 2) / 1.55;
+    // Leave space for the moon's orbit + radius inside the canvas.
+    // Must be >= MOON_ORBIT_R + moon size (1.58 + 0.10 = 1.68).
+    const R = (BUF / 2) / 1.72;
 
     // --- Moon as a dot-sphere (same visual language as earth) ---
     // 10% of earth diameter, 500 fibonacci dots. Mare regions render
@@ -939,15 +940,13 @@ export default function Earth({
       const out: MoonDot[] = [];
       const golden = Math.PI * (3 - Math.sqrt(5));
       // Mare regions: (lat, lon, outerRadius, innerRadius) in radians.
-      // Dots inside inner = deep mare; between inner & outer = mare edge.
+      // Kept small so they read as patches, not half the sphere.
       const mares: [number, number, number, number][] = [
-        [0.15, 0.4, 0.40, 0.22],    // Tranquillitatis
-        [-0.18, -0.35, 0.32, 0.18],  // Imbrium
-        [0.35, -0.05, 0.24, 0.12],  // Serenitatis
-        [-0.30, 0.50, 0.26, 0.14],  // Nubium
-        [0.05, -0.65, 0.20, 0.10],  // Humorum
-        [-0.50, -0.10, 0.18, 0.09], // Nectaris
-        [0.50, 0.30, 0.15, 0.08],   // small patch
+        [0.15, 0.3, 0.22, 0.12],   // Tranquillitatis
+        [-0.20, -0.25, 0.18, 0.10], // Imbrium
+        [0.40, -0.10, 0.14, 0.07], // Serenitatis
+        [-0.35, 0.40, 0.15, 0.08], // Nubium
+        [0.05, -0.55, 0.12, 0.06], // Humorum
       ];
       // Bright crater locations: (lat, lon, radius).
       const craters: [number, number, number][] = [
@@ -1129,19 +1128,16 @@ export default function Earth({
 
         const moonSx = cx + R * mx;
         const moonSy = cy - R * my;
-        const mCosR = Math.cos(moonAngle);
-        const mSinR = Math.sin(moonAngle);
         for (const md of moonDots) {
-            // Rotate around Y (tidal lock).
-            const dx1 = md.x * mCosR + md.z * mSinR;
-            const dz1 = -md.x * mSinR + md.z * mCosR;
-            const dy1 = md.y;
-            if (dz1 < -0.02) continue;
+            // No rotation — moon always faces the viewer. Tidal
+            // locking would make half the dots invisible when the
+            // moon is at the side of its orbit.
+            if (md.z < -0.02) continue;
 
             // World position of this dot in earth-radii.
-            const wx = mx + dx1 * MOON_R_UNIT;
-            const wy = my + dy1 * MOON_R_UNIT;
-            const wz = mz + dz1 * MOON_R_UNIT;
+            const wx = mx + md.x * MOON_R_UNIT;
+            const wy = my + md.y * MOON_R_UNIT;
+            const wz = mz + md.z * MOON_R_UNIT;
             // Occlude if this dot is behind the earth's surface.
             const wd2 = wx * wx + wy * wy;
             if (wd2 < 1) {
@@ -1149,28 +1145,20 @@ export default function Earth({
               if (wz < earthZ) continue;
             }
 
-            const dsx = moonSx + MOON_R * dx1;
-            const dsy = moonSy - MOON_R * dy1;
-            // No directional lighting on the moon — it's too small
-            // for shading to read as "phase"; it just eats half the
-            // dots. Terrain + jitter provide all the surface texture.
-            const jitter = 0.82 + 0.36 * md.seed;
-            // Terrain drives alpha, color, AND dot size for contrast.
-            //   0 deep mare:  smaller dark dots — the "seas"
-            //   1 mare edge:  medium dots — transition
-            //   2 highland:   normal bright dots
-            //   3 crater rim: large bright dots — visual anchors
-            let baseAlpha: number;
+            const dsx = moonSx + MOON_R * md.x;
+            const dsy = moonSy - MOON_R * md.y;
+            // Terrain contrast via dot size and color — no alpha
+            // games, which make dots vanish on small dark screens.
             let color: string;
             let dotSize: number;
             switch (md.terrain) {
-              case 0:  baseAlpha = 0.30; color = "rgb(140, 142, 148)"; dotSize = 0.60 * dpr; break;
-              case 1:  baseAlpha = 0.45; color = "rgb(170, 168, 162)"; dotSize = 0.75 * dpr; break;
-              case 3:  baseAlpha = 0.90; color = "rgb(245, 242, 234)"; dotSize = 1.10 * dpr; break;
-              default: baseAlpha = 0.65; color = "rgb(218, 214, 204)"; dotSize = 0.85 * dpr; break;
+              case 0:  color = "rgb(100, 100, 106)"; dotSize = 0.45 * dpr; break;
+              case 1:  color = "rgb(130, 128, 124)"; dotSize = 0.55 * dpr; break;
+              case 3:  color = "rgb(210, 208, 202)"; dotSize = 0.85 * dpr; break;
+              default: color = "rgb(160, 158, 152)"; dotSize = 0.65 * dpr; break;
             }
             ctx.fillStyle = color;
-            ctx.globalAlpha = baseAlpha * jitter;
+            ctx.globalAlpha = 0.50;
             ctx.fillRect(dsx - dotSize / 2, dsy - dotSize / 2, dotSize, dotSize);
         }
         ctx.globalAlpha = 1;
