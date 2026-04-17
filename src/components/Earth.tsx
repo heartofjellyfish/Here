@@ -925,20 +925,40 @@ export default function Earth({
     // 8% of earth diameter, 300 fibonacci dots. Some dots fall inside
     // "mare" regions and render darker, giving the familiar patchwork.
     const MOON_R = R * 0.08;
-    type MoonDot = { x: number; y: number; z: number; mare: boolean };
+    // Each moon dot carries a terrain type and a per-dot brightness
+    // seed so the surface reads as textured, not a smooth ball.
+    type MoonDot = {
+      x: number; y: number; z: number;
+      // 0 = deep mare, 1 = mare edge, 2 = highland, 3 = bright crater rim
+      terrain: number;
+      // deterministic per-dot brightness jitter [0..1]
+      seed: number;
+    };
     const moonDots: MoonDot[] = (() => {
       const n = 300;
       const out: MoonDot[] = [];
       const golden = Math.PI * (3 - Math.sqrt(5));
-      // Mare regions: (lat, lon, angularRadius) in radians.
-      // Loosely inspired by the real near-side maria.
-      const mares: [number, number, number][] = [
-        [0.15, 0.4, 0.38],    // Tranquillitatis-ish
-        [-0.18, -0.35, 0.30],  // Imbrium-ish
-        [0.35, -0.05, 0.22],  // Serenitatis-ish
-        [-0.30, 0.50, 0.24],  // Nubium-ish
-        [0.05, -0.65, 0.18],  // small patch
+      // Mare regions: (lat, lon, outerRadius, innerRadius) in radians.
+      // Dots inside inner = deep mare; between inner & outer = mare edge.
+      const mares: [number, number, number, number][] = [
+        [0.15, 0.4, 0.40, 0.22],    // Tranquillitatis
+        [-0.18, -0.35, 0.32, 0.18],  // Imbrium
+        [0.35, -0.05, 0.24, 0.12],  // Serenitatis
+        [-0.30, 0.50, 0.26, 0.14],  // Nubium
+        [0.05, -0.65, 0.20, 0.10],  // Humorum
+        [-0.50, -0.10, 0.18, 0.09], // Nectaris
+        [0.50, 0.30, 0.15, 0.08],   // small patch
       ];
+      // Bright crater locations: (lat, lon, radius).
+      const craters: [number, number, number][] = [
+        [0.55, -0.40, 0.10],  // Tycho-ish
+        [-0.45, 0.65, 0.08],  // Copernicus-ish
+        [0.10, -0.90, 0.07],  // Kepler-ish
+        [-0.60, -0.50, 0.06], // small crater
+      ];
+      // Simple deterministic hash for per-dot jitter.
+      const hash = (i: number) => ((i * 2654435761) >>> 0) / 4294967296;
+
       for (let i = 0; i < n; i++) {
         const y = 1 - (i / (n - 1)) * 2;
         const r = Math.sqrt(Math.max(0, 1 - y * y));
@@ -947,13 +967,24 @@ export default function Earth({
         const z = Math.sin(theta) * r;
         const lat = Math.asin(y);
         const lon = Math.atan2(z, x);
-        let mare = false;
-        for (const [mlat, mlon, mrad] of mares) {
-          const dl = lat - mlat;
-          const dp = lon - mlon;
-          if (dl * dl + dp * dp < mrad * mrad) { mare = true; break; }
+
+        let terrain = 2; // default: highland
+        // Check craters first (override mare).
+        for (const [clat, clon, crad] of craters) {
+          const dl = lat - clat;
+          const dp = lon - clon;
+          if (dl * dl + dp * dp < crad * crad) { terrain = 3; break; }
         }
-        out.push({ x, y, z, mare });
+        if (terrain !== 3) {
+          for (const [mlat, mlon, outer, inner] of mares) {
+            const dl = lat - mlat;
+            const dp = lon - mlon;
+            const d2 = dl * dl + dp * dp;
+            if (d2 < inner * inner) { terrain = 0; break; }      // deep mare
+            if (d2 < outer * outer) { terrain = 1; break; }      // mare edge
+          }
+        }
+        out.push({ x, y, z, terrain, seed: hash(i) });
       }
       return out;
     })();
@@ -1112,24 +1143,35 @@ export default function Earth({
           const mSinR = Math.sin(moonAngle);
           const moonDotSize = 0.9 * dpr;
 
-          ctx.fillStyle = "rgba(220, 216, 206, 1)";
           for (const md of moonDots) {
             // Rotate around Y (tidal lock).
             const dx1 = md.x * mCosR + md.z * mSinR;
             const dz1 = -md.x * mSinR + md.z * mCosR;
             const dy1 = md.y;
-            // Back-face cull — viewer is at +Z.
             if (dz1 < -0.02) continue;
-            // Screen position relative to moon center.
             const dsx = moonSx + MOON_R * dx1;
             const dsy = moonSy - MOON_R * dy1;
-            // Lighting: same key light as earth.
+            // Lighting + limb darkening.
             const lam = Math.max(0, LX * dx1 + LY * dy1 + LZ * dz1);
-            const shade = 0.35 + 0.65 * lam;
-            // Limb darkening — dots near the edge fade.
+            const shade = 0.30 + 0.70 * lam;
             const limb = Math.max(0, dz1);
-            const baseAlpha = md.mare ? 0.40 : 0.78;
-            ctx.globalAlpha = baseAlpha * shade * (0.4 + 0.6 * limb);
+            // Per-dot jitter breaks up uniformity (±20% brightness).
+            const jitter = 0.80 + 0.40 * md.seed;
+            // Terrain-dependent alpha and color.
+            //   0 deep mare:  very dark, slightly blue-grey
+            //   1 mare edge:  medium dark
+            //   2 highland:   bright warm grey
+            //   3 crater rim: brightest, slight sparkle
+            let baseAlpha: number;
+            let color: string;
+            switch (md.terrain) {
+              case 0:  baseAlpha = 0.14; color = "rgb(160, 162, 168)"; break;
+              case 1:  baseAlpha = 0.25; color = "rgb(180, 178, 174)"; break;
+              case 3:  baseAlpha = 0.62; color = "rgb(240, 236, 228)"; break;
+              default: baseAlpha = 0.45; color = "rgb(220, 216, 206)"; break;
+            }
+            ctx.fillStyle = color;
+            ctx.globalAlpha = baseAlpha * shade * (0.35 + 0.65 * limb) * jitter;
             ctx.fillRect(dsx - moonDotSize / 2, dsy - moonDotSize / 2, moonDotSize, moonDotSize);
           }
           ctx.globalAlpha = 1;
